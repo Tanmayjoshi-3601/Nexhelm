@@ -1,0 +1,25 @@
+# Web Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0  # Server to run FastAPI
+
+# WebSocket Support  
+python-socketio==5.10.0     # WebSocket library
+python-socketio[asyncio]    # Async support
+
+# Redis
+redis==5.0.1                # Redis client
+hiredis==2.2.3             # Faster Redis parser (optional but good)
+
+# AI/LLM
+openai==1.3.0              # For GPT-4
+anthropic==0.7.0           # For Claude (optional)
+
+# Utilities
+python-dotenv==1.0.0       # Environment variables
+pydantic==2.5.0           # Data validation
+python-multipart==0.0.6    # File uploads
+aiofiles==23.2.1          # Async file handling
+
+# Development
+pytest==7.4.3             # Testing
+black==23.11.0            # Code formatting

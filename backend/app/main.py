@@ -1,88 +1,289 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 import uvicorn
 import json
+import uuid
+from datetime import datetime
 
-# Create FastAPI instance
+# Import from the same directory - use absolute import for direct execution
+try:
+    from .redis_client import redis_client
+except ImportError:
+    # Fallback for direct execution
+    from redis_client import redis_client
+
 app = FastAPI(title="Nexhelm POC")
 
-# CORS Middleware - allows react frontend (which runs on port 3000) to talk to this server
 app.add_middleware(
     CORSMiddleware,
-    allow_origins = ["http://localhost:3000"],
-    allow_credentials = True,
-    allow_methods = ["*"],
-    allow_headers = ["*"],
+    allow_origins=["*"],  # Allow all origins for testing
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-
 class ConnectionManager:
-    """Manages Websocket connections"""
-
     def __init__(self):
-        self.active_connections: list[WebSocket] = []
-
-    async def connect(self,websocket: WebSocket):
-        """Accept new connection"""
+        self.active_connections: dict[str, list[WebSocket]] = {}
+    
+    async def connect(self, websocket: WebSocket, meeting_id: str):
         await websocket.accept()
-        self.active_connections.append(websocket)
-        print(f"Client connected. Total connections: {len(self.active_connections)}")
+        
+        if meeting_id not in self.active_connections:
+            self.active_connections[meeting_id] = []
+        
+        self.active_connections[meeting_id].append(websocket)
+        
+        await websocket.send_json({
+            "type": "connection",
+            "message": "Connected to meeting",
+            "meeting_id": meeting_id
+        })
+        
+        print(f"Client connected to meeting {meeting_id}")
     
-    def disconnect(self, websocket: WebSocket):
-        "Disconnect a client"
-        self.active_connections.remove(websocket)
-        print(f"Client disconnected. Total connections: {len(self.active_connections)}")
+    def disconnect(self, websocket: WebSocket, meeting_id: str):
+        if meeting_id in self.active_connections:
+            self.active_connections[meeting_id].remove(websocket)
+            if not self.active_connections[meeting_id]:
+                del self.active_connections[meeting_id]
+        print(f"Client disconnected from meeting {meeting_id}")
     
-    async def send_message(self, message: str, websocket: WebSocket):
-        """ Send message to a specific client"""
-        await websocket.send_text(message)
-    
-    async def broadcast(self, message:str):
-        for connection in self.active_connections:
-            await connection.send_text(message)
-    
+    async def send_to_meeting(self, meeting_id: str, message: dict):
+        if meeting_id in self.active_connections:
+            for connection in self.active_connections[meeting_id]:
+                await connection.send_json(message)
 
-# create a connection manager
 manager = ConnectionManager()
+
+# Serve the HTML test client
+@app.get("/test", response_class=HTMLResponse)
+async def test_page():
+    """Serve test client HTML"""
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Nexhelm WebSocket Test</title>
+        <style>
+            body { font-family: Arial; max-width: 800px; margin: 50px auto; }
+            #messages { border: 1px solid #ccc; height: 300px; overflow-y: scroll; padding: 10px; margin: 20px 0; }
+            .message { margin: 5px 0; padding: 5px; background: #f0f0f0; }
+            .opportunity { background: #ffffcc; border-left: 4px solid orange; padding: 10px; margin: 10px 0; }
+            button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+            input { padding: 10px; width: 300px; }
+            .status { padding: 10px; background: #e0f0e0; margin: 10px 0; }
+        </style>
+    </head>
+    <body>
+        <h1>Nexhelm POC - WebSocket Test</h1>
+        
+        <div class="status" id="status">Status: Not connected</div>
+        
+        <div>
+            <button onclick="createMeeting()">1. Create Meeting</button>
+            <button onclick="connect()">2. Connect to Meeting</button>
+            <button onclick="disconnect()">3. Disconnect</button>
+        </div>
+        
+        <div>
+            <input type="text" id="messageInput" placeholder="Type a message (try 'retirement')..." />
+            <button onclick="sendMessage()">Send</button>
+        </div>
+        
+        <div id="messages"></div>
+        
+        <script>
+            let ws = null;
+            let meetingId = null;
+            
+            async function createMeeting() {
+                try {
+                    const response = await fetch('/api/meeting/create', {
+                        method: 'POST'
+                    });
+                    const data = await response.json();
+                    meetingId = data.meeting_id;
+                    
+                    document.getElementById('status').innerHTML = 
+                        `Status: Meeting created - ID: ${meetingId}`;
+                    document.getElementById('messages').innerHTML += 
+                        `<div class="message">✓ Meeting created: ${meetingId}</div>`;
+                } catch (error) {
+                    alert('Error creating meeting: ' + error);
+                }
+            }
+            
+            function connect() {
+                if (!meetingId) {
+                    alert('Create a meeting first!');
+                    return;
+                }
+                
+                ws = new WebSocket(`ws://localhost:8001/ws/${meetingId}`);
+                
+                ws.onopen = () => {
+                    document.getElementById('status').innerHTML = 
+                        `Status: Connected to meeting ${meetingId}`;
+                    console.log('Connected');
+                };
+                
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    const messagesDiv = document.getElementById('messages');
+                    
+                    if (data.type === 'opportunity') {
+                        messagesDiv.innerHTML += 
+                            `<div class="opportunity">
+                                <strong>🎯 Opportunity Detected!</strong><br>
+                                ${data.opportunity.title}<br>
+                                Score: ${data.score}
+                            </div>`;
+                    } else if (data.type === 'message') {
+                        messagesDiv.innerHTML += 
+                            `<div class="message">${data.speaker}: ${data.text}</div>`;
+                    } else if (data.type === 'history') {
+                        messagesDiv.innerHTML += 
+                            `<div class="message">📜 Loaded ${data.messages.length} historical messages</div>`;
+                    }
+                    
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                };
+                
+                ws.onclose = () => {
+                    document.getElementById('status').innerHTML = 'Status: Disconnected';
+                    console.log('Disconnected');
+                };
+                
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    alert('WebSocket error - check console');
+                };
+            }
+            
+            function sendMessage() {
+                const input = document.getElementById('messageInput');
+                if (ws && ws.readyState === WebSocket.OPEN && input.value) {
+                    ws.send(JSON.stringify({
+                        speaker: 'Client',
+                        text: input.value
+                    }));
+                    input.value = '';
+                } else if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    alert('Not connected! Click Connect first.');
+                }
+            }
+            
+            function disconnect() {
+                if (ws) {
+                    ws.close();
+                }
+            }
+            
+            // Send on Enter key
+            document.getElementById('messageInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') sendMessage();
+            });
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
 
 @app.get("/")
 def read_root():
-    "Test endpoint to verify server is running"
-    return {"message":"Nexhelm POC running!"}
+    return {"message": "Nexhelm POC Server Running!", "test_url": "http://localhost:8001/test", "status": "Redis connected and ready"}
 
-
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+@app.post("/api/meeting/create")
+async def create_meeting(client_id: str = "demo-client"):
+    """Create a new meeting session"""
+    meeting_id = str(uuid.uuid4())
     
-    # accept connection
-    await manager.connect(websocket)
+    # Create meeting in Redis
+    meeting_data = redis_client.create_meeting(meeting_id, client_id)
+    
+    return {
+        "meeting_id": meeting_id,
+        "client_id": client_id,
+        "status": "created"
+    }
 
+@app.get("/api/meeting/{meeting_id}/history")
+async def get_meeting_history(meeting_id: str):
+    """Get conversation history for a meeting"""
+    conversation = redis_client.get_conversation(meeting_id)
+    opportunities = redis_client.get_top_opportunities(meeting_id)
+    
+    return {
+        "meeting_id": meeting_id,
+        "conversation": conversation,
+        "opportunities": opportunities
+    }
+
+@app.websocket("/ws/{meeting_id}")
+async def websocket_endpoint(websocket: WebSocket, meeting_id: str):
+    """WebSocket endpoint for real-time meeting communication"""
+    
+    await manager.connect(websocket, meeting_id)
+    
+    # Send existing conversation history
+    history = redis_client.get_conversation(meeting_id, last_n=10)
+    await websocket.send_json({
+        "type": "history",
+        "messages": history
+    })
+    
     try:
         while True:
-            # wait for message from client
-            data = await websocket.recieve_text()
-            print(f"Recieved: {data}")
-
-            # echo back to sender
-            await manager.send_message(f"Echo: {data}", websocket)
-
-            # broadcast to all clients
-            await manager.broadcast(f"Someone said {data}")
+            # Receive message
+            data = await websocket.receive_json()
+            
+            # Store in Redis
+            message = f"{data.get('speaker', 'Unknown')}: {data.get('text', '')}"
+            redis_client.add_message(meeting_id, message)
+            
+            # Echo to all in meeting
+            await manager.send_to_meeting(meeting_id, {
+                "type": "message",
+                "speaker": data.get('speaker'),
+                "text": data.get('text'),
+                "timestamp": datetime.now().isoformat()
+            })
+            
+            # Simple opportunity detection
+            text_lower = data.get('text', '').lower()
+            if "retirement" in text_lower:
+                opportunity = {
+                    "type": "retirement_planning",
+                    "title": "Retirement Planning Opportunity",
+                    "description": "Client mentioned retirement - review 401k options"
+                }
+                redis_client.add_opportunity(meeting_id, opportunity, 85)
+                
+                await manager.send_to_meeting(meeting_id, {
+                    "type": "opportunity",
+                    "opportunity": opportunity,
+                    "score": 85
+                })
+            elif "college" in text_lower or "daughter" in text_lower:
+                opportunity = {
+                    "type": "education_planning",
+                    "title": "529 Education Savings Plan",
+                    "description": "Client mentioned college - discuss education savings"
+                }
+                redis_client.add_opportunity(meeting_id, opportunity, 75)
+                
+                await manager.send_to_meeting(meeting_id, {
+                    "type": "opportunity",
+                    "opportunity": opportunity,
+                    "score": 75
+                })
+    
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
-        await manager.broadcast("A client disconnected")
-
-
-@app.get("/health")
-def health_check():
-    "Health check endpoint"
-    return {"status":"healthy"}
+        manager.disconnect(websocket, meeting_id)
 
 if __name__ == "__main__":
-    # run the server
-    uvicorn.run(
-        "main:app", # tells uvicorn to run the 'app' from main.py
-        host = '0.0.0.0',
-        port = 8001,
-        reload = True
-    )
+    print("Starting Nexhelm POC Server...")
+    print("Test interface will be available at: http://localhost:8001/test")
+    uvicorn.run(app, host="0.0.0.0", port=8001, reload=True)
