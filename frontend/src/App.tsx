@@ -69,6 +69,11 @@ const App: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Demo state
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [demoScenarios, setDemoScenarios] = useState<{ [key: string]: { name: string, duration: number } }>({});
+  const [selectedScenario, setSelectedScenario] = useState<string>('');
+
   // Client profile (mock data for demo)
   const clientProfile: ClientProfile = {
     name: 'John & Sarah Mitchell',
@@ -259,6 +264,67 @@ const App: React.FC = () => {
   };
 
   /**
+   * Load demo scenarios when component mounts
+   */
+  useEffect(() => {
+    const loadDemoScenarios = async () => {
+      try {
+        const response = await axios.get(`${BACKEND_URL}/api/demo/scenarios`);
+        setDemoScenarios(response.data);
+        // Set default scenario
+        const firstScenario = Object.keys(response.data)[0];
+        if (firstScenario) {
+          setSelectedScenario(firstScenario);
+        }
+      } catch (error) {
+        console.error('Failed to load demo scenarios:', error);
+      }
+    };
+
+    loadDemoScenarios();
+  }, []);
+
+  /**
+   * Start demo conversation
+   */
+  const startDemo = async () => {
+    if (!meetingId || !selectedScenario) return;
+
+    try {
+      const response = await axios.post(`${BACKEND_URL}/api/demo/start/${meetingId}?scenario=${selectedScenario}`);
+      if (response.data.status === 'Demo started') {
+        setIsDemoMode(true);
+        toast.success(`Demo started: ${demoScenarios[selectedScenario]?.name}`);
+      } else {
+        toast.error(response.data.error || 'Failed to start demo');
+      }
+    } catch (error) {
+      console.error('Failed to start demo:', error);
+      toast.error('Failed to start demo');
+    }
+  };
+
+  /**
+   * Stop demo conversation
+   */
+  const stopDemo = async () => {
+    if (!meetingId) return;
+
+    try {
+      const response = await axios.post(`${BACKEND_URL}/api/demo/stop/${meetingId}`);
+      if (response.data.status === 'Demo stopped') {
+        setIsDemoMode(false);
+        toast.success('Demo stopped');
+      } else {
+        toast.error(response.data.error || 'Failed to stop demo');
+      }
+    } catch (error) {
+      console.error('Failed to stop demo:', error);
+      toast.error('Failed to stop demo');
+    }
+  };
+
+  /**
    * Clean up WebSocket connection when component unmounts
    */
   useEffect(() => {
@@ -323,17 +389,66 @@ const App: React.FC = () => {
             </button>
           </div>
         ) : (
-          <div className="mt-4 flex items-center space-x-4">
-            <span className="text-sm text-gray-500">
-              Meeting ID: <code className="bg-gray-100 px-2 py-1 rounded">{meetingId}</code>
-            </span>
-            {!isConnected && (
-              <button
-                onClick={() => connectToMeeting(meetingId)}
-                className="px-4 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm"
-              >
-                Reconnect
-              </button>
+          <div className="mt-4 space-y-4">
+            <div className="flex items-center space-x-4">
+              <span className="text-sm text-gray-500">
+                Meeting ID: <code className="bg-gray-100 px-2 py-1 rounded">{meetingId}</code>
+              </span>
+              {!isConnected && (
+                <button
+                  onClick={() => connectToMeeting(meetingId)}
+                  className="px-4 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm"
+                >
+                  Reconnect
+                </button>
+              )}
+            </div>
+
+            {/* Demo Controls */}
+            {isConnected && (
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg border border-purple-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <span className="text-sm font-medium text-purple-800">🎭 Demo Mode</span>
+                    <select
+                      value={selectedScenario}
+                      onChange={(e) => setSelectedScenario(e.target.value)}
+                      className="px-3 py-1 border border-purple-300 rounded text-sm"
+                      disabled={isDemoMode}
+                    >
+                      {Object.entries(demoScenarios).map(([key, scenario]) => (
+                        <option key={key} value={key}>
+                          {scenario.name} ({scenario.duration}s)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    {!isDemoMode ? (
+                      <button
+                        onClick={startDemo}
+                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+                      >
+                        ▶️ Start Demo
+                      </button>
+                    ) : (
+                      <button
+                        onClick={stopDemo}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                      >
+                        ⏹️ Stop Demo
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {isDemoMode && (
+                  <div className="mt-2 text-xs text-purple-600">
+                    🎬 Demo conversation running... Opportunities will appear automatically!
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -408,14 +523,14 @@ const App: React.FC = () => {
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                placeholder="Type a message or use voice..."
+                placeholder={isDemoMode ? "Demo mode active - conversation running automatically..." : "Type a message or use voice..."}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                disabled={!isConnected}
+                disabled={!isConnected || isDemoMode}
               />
 
               <button
                 onClick={sendMessage}
-                disabled={!isConnected || !inputText.trim()}
+                disabled={!isConnected || !inputText.trim() || isDemoMode}
                 className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
               >
                 Send

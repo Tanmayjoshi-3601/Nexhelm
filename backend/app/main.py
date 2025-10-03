@@ -15,9 +15,11 @@ except ImportError:
 # Import from the same directory - use absolute import for direct execution
 try:
     from .redis_client import redis_client
+    from .dummy_transcript import dummy_transcript_service
 except ImportError:
     # Fallback for direct execution
     from redis_client import redis_client
+    from dummy_transcript import dummy_transcript_service
 
 app = FastAPI(title="Nexhelm POC")
 detector = OpportunityDetector()
@@ -227,6 +229,90 @@ async def get_meeting_history(meeting_id: str):
         "conversation": conversation,
         "opportunities": opportunities
     }
+
+@app.get("/api/demo/scenarios")
+async def get_demo_scenarios():
+    """Get available demo scenarios"""
+    return dummy_transcript_service.get_available_scenarios()
+
+@app.post("/api/demo/start/{meeting_id}")
+async def start_demo(meeting_id: str, scenario: str):
+    """Start a demo conversation"""
+    try:
+        # Check if demo is already running
+        if dummy_transcript_service.is_demo_running(meeting_id):
+            return {"error": "Demo already running for this meeting"}
+        
+        # Create opportunity detection callback
+        async def opportunity_callback(text: str, speaker: str):
+            # Store message in Redis (same as normal flow)
+            message = f"{speaker}: {text}"
+            redis_client.add_message(meeting_id, message)
+            
+            # Get recent messages for context
+            recent_messages = redis_client.get_conversation(meeting_id, last_n=5)
+            context = "\n".join(recent_messages)
+            
+            # Mock client profile
+            client_profile = {
+                'age': 58,
+                'income': 150000,
+                'family_status': 'married_with_children',
+                'products': ['401k', 'term_life']
+            }
+            
+            # Run opportunity detection
+            opportunities = detector.detect_opportunities(
+                transcript=context,
+                client_profile=client_profile,
+                use_llm=True
+            )
+            
+            # Process and send opportunities
+            for opportunity in opportunities:
+                # Store in Redis
+                redis_client.add_opportunity(
+                    meeting_id,
+                    opportunity,
+                    opportunity.get('score', 50)
+                )
+                
+                # Broadcast to clients
+                await manager.send_to_meeting(meeting_id, {
+                    "type": "opportunity",
+                    "opportunity": opportunity,
+                    "score": opportunity.get('score', 50),
+                    "detected_by": opportunity.get('detected_by', 'unknown')
+                })
+        
+        # Start the demo with opportunity detection
+        await dummy_transcript_service.start_demo(
+            meeting_id, 
+            scenario, 
+            lambda msg: manager.send_to_meeting(meeting_id, msg),
+            opportunity_callback
+        )
+        
+        return {"status": "Demo started", "scenario": scenario}
+    except ValueError as e:
+        return {"error": str(e)}
+    except Exception as e:
+        return {"error": f"Failed to start demo: {str(e)}"}
+
+@app.post("/api/demo/stop/{meeting_id}")
+async def stop_demo(meeting_id: str):
+    """Stop a running demo"""
+    try:
+        await dummy_transcript_service.stop_demo(meeting_id)
+        return {"status": "Demo stopped"}
+    except Exception as e:
+        return {"error": f"Failed to stop demo: {str(e)}"}
+
+@app.get("/api/demo/status/{meeting_id}")
+async def get_demo_status(meeting_id: str):
+    """Get demo status for a meeting"""
+    is_running = dummy_transcript_service.is_demo_running(meeting_id)
+    return {"meeting_id": meeting_id, "demo_running": is_running}
 
 @app.websocket("/ws/{meeting_id}")
 async def websocket_endpoint(websocket: WebSocket, meeting_id: str):
