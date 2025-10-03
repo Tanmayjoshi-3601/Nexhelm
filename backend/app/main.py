@@ -6,6 +6,12 @@ import json
 import uuid
 from datetime import datetime
 
+# Import opportunity detector with fallback
+try:
+    from .opportunity_detector import OpportunityDetector
+except ImportError:
+    from opportunity_detector import OpportunityDetector
+
 # Import from the same directory - use absolute import for direct execution
 try:
     from .redis_client import redis_client
@@ -14,6 +20,7 @@ except ImportError:
     from redis_client import redis_client
 
 app = FastAPI(title="Nexhelm POC")
+detector = OpportunityDetector()
 
 app.add_middleware(
     CORSMiddleware,
@@ -223,7 +230,7 @@ async def get_meeting_history(meeting_id: str):
 
 @app.websocket("/ws/{meeting_id}")
 async def websocket_endpoint(websocket: WebSocket, meeting_id: str):
-    """WebSocket endpoint for real-time meeting communication"""
+    """WebSocket endpoint for real-time meeting communication with intelligent opportunity detection added"""
     
     await manager.connect(websocket, meeting_id)
     
@@ -233,6 +240,14 @@ async def websocket_endpoint(websocket: WebSocket, meeting_id: str):
         "type": "history",
         "messages": history
     })
+
+    # mock client profile -> should come from CRM 
+    client_profile = {
+        'age': 58,
+        'income': 150000,
+        'family_status': 'married_with_children',
+        'products': ['401k', 'term_life']
+    }
     
     try:
         while True:
@@ -251,34 +266,63 @@ async def websocket_endpoint(websocket: WebSocket, meeting_id: str):
                 "timestamp": datetime.now().isoformat()
             })
             
-            # Simple opportunity detection
-            text_lower = data.get('text', '').lower()
-            if "retirement" in text_lower:
-                opportunity = {
-                    "type": "retirement_planning",
-                    "title": "Retirement Planning Opportunity",
-                    "description": "Client mentioned retirement - review 401k options"
-                }
-                redis_client.add_opportunity(meeting_id, opportunity, 85)
-                
-                await manager.send_to_meeting(meeting_id, {
-                    "type": "opportunity",
+            # intelligent opportunity detection
+            # get recent messages -> recent 5 messages
+            recent_messages = redis_client.get_conversation(meeting_id, last_n = 5)
+            context = "\n".join(recent_messages)
+
+            # opportunity detection
+            opportunities = detector.detect_opportunities(
+                transcript=context,
+                client_profile=client_profile,
+                use_llm = True
+            )
+            for opportunity in opportunities:
+
+                # store in Redis
+                redis_client.add_opportunity(
+                    meeting_id,
+                    opportunity,
+                    opportunity.get('score',50)
+                )
+
+                # broadcast to clients
+                await manager.send_to_meeting(meeting_id,{
+                     "type": "opportunity",
                     "opportunity": opportunity,
-                    "score": 85
+                    "score": opportunity.get('score', 50),
+                    "detected_by": opportunity.get('detected_by', 'unknown')
                 })
-            elif "college" in text_lower or "daughter" in text_lower:
-                opportunity = {
-                    "type": "education_planning",
-                    "title": "529 Education Savings Plan",
-                    "description": "Client mentioned college - discuss education savings"
-                }
-                redis_client.add_opportunity(meeting_id, opportunity, 75)
+
+
+            # # Simple opportunity detection
+            # text_lower = data.get('text', '').lower()
+            # if "retirement" in text_lower:
+            #     opportunity = {
+            #         "type": "retirement_planning",
+            #         "title": "Retirement Planning Opportunity",
+            #         "description": "Client mentioned retirement - review 401k options"
+            #     }
+            #     redis_client.add_opportunity(meeting_id, opportunity, 85)
                 
-                await manager.send_to_meeting(meeting_id, {
-                    "type": "opportunity",
-                    "opportunity": opportunity,
-                    "score": 75
-                })
+            #     await manager.send_to_meeting(meeting_id, {
+            #         "type": "opportunity",
+            #         "opportunity": opportunity,
+            #         "score": 85
+            #     })
+            # elif "college" in text_lower or "daughter" in text_lower:
+            #     opportunity = {
+            #         "type": "education_planning",
+            #         "title": "529 Education Savings Plan",
+            #         "description": "Client mentioned college - discuss education savings"
+            #     }
+            #     redis_client.add_opportunity(meeting_id, opportunity, 75)
+                
+            #     await manager.send_to_meeting(meeting_id, {
+            #         "type": "opportunity",
+            #         "opportunity": opportunity,
+            #         "score": 75
+            #     })
     
     except WebSocketDisconnect:
         manager.disconnect(websocket, meeting_id)

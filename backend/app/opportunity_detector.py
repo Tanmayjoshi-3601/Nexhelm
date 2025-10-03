@@ -2,13 +2,10 @@ import re
 import json
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
-import openai
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
-
-openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
 class OpportunityDetector:
@@ -19,6 +16,18 @@ class OpportunityDetector:
     """
 
     def __init__(self):
+
+         # Store API key but don't create client yet
+        self.api_key = os.getenv('OPENAI_API_KEY')
+        self.model = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
+        
+        # Check if LLM is available
+        if self.api_key:
+            print(f"✓ OpenAI API key found, will use model: {self.model}")
+            self.llm_available = True
+        else:
+            print("⚠️ No OpenAI API key found - LLM detection disabled")
+            self.llm_available = False
 
         # layer 1: keyword/ patterns
         self.trigger_patterns = {
@@ -163,7 +172,7 @@ class OpportunityDetector:
         all_opportunities = []
 
         # layer 1: Pattern-based detection
-        pattern_opportunities = self.detect_patterns(transcript)
+        pattern_opportunities = self._detect_patterns(transcript)
         all_opportunities.extend(pattern_opportunities)
 
         # layer 2: Contextual detection (combines patterns with client profile)
@@ -172,7 +181,7 @@ class OpportunityDetector:
             all_opportunities.extend(contextual_opportunities)
 
         # layer 3: LLM-based detection
-        if use_llm and openai.api_key:
+        if use_llm and self.llm_available:
             llm_opportunties = self._detect_with_llm(transcript,client_profile)
             all_opportunities.extend(llm_opportunties)
         
@@ -382,22 +391,25 @@ class OpportunityDetector:
         """
         
         # Check API key exists
-        if not openai.api_key:
+        if not self.llm_available:
             print("No OpenAI API key found - skipping LLM detection")
             return []
         
         try:
             # Build the prompt for GPT-4
-           
             prompt = self._build_llm_prompt(transcript, client_profile)
             
-            # Call GPT-4
-            from openai import OpenAI
-            client = OpenAI(api_key=openai.api_key)
+            # Use direct HTTP requests to avoid client initialization issues
+            import requests
             
-            response = client.chat.completions.create(
-                model="gpt-4",  
-                messages=[
+            headers = {
+                'Authorization': f'Bearer {self.api_key}',
+                'Content-Type': 'application/json'
+            }
+            
+            data = {
+                'model': self.model,
+                'messages': [
                     {
                         "role": "system",
                         "content": "You are a financial advisor assistant specialized in identifying opportunities from client conversations."
@@ -407,12 +419,22 @@ class OpportunityDetector:
                         "content": prompt
                     }
                 ],
-                temperature=0.3,  # Low temperature = more consistent/logical
-                max_tokens=500   # Limit response length 
+                'temperature': 0.3,
+                'max_tokens': 500
+            }
+            
+            response = requests.post(
+                'https://api.openai.com/v1/chat/completions',
+                headers=headers,
+                json=data,
+                timeout=30
             )
             
-            # Extract the response text
-            llm_response = response.choices[0].message.content
+            if response.status_code != 200:
+                raise Exception(f"OpenAI API error: {response.status_code} - {response.text}")
+            
+            response_data = response.json()
+            llm_response = response_data['choices'][0]['message']['content']
             
             # Parse the LLM response into opportunities
             opportunities = self._parse_llm_response(llm_response)
@@ -448,10 +470,16 @@ class OpportunityDetector:
         
         # Start with client context if available
         if client_profile:
+            income = client_profile.get('income', 'Unknown')
+            if isinstance(income, (int, float)):
+                income_str = f"${income:,}"
+            else:
+                income_str = str(income)
+                
             context = f"""
 Client Profile:
 - Age: {client_profile.get('age', 'Unknown')}
-- Income: ${client_profile.get('income', 'Unknown'):,} if isinstance(client_profile.get('income'), (int, float)) else client_profile.get('income', 'Unknown')}
+- Income: {income_str}
 - Family: {client_profile.get('family_status', 'Unknown')}
 - Current Products: {client_profile.get('products', [])}
 """
