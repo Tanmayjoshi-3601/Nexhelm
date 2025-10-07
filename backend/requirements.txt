@@ -1,6 +1,7 @@
 # Web Framework
 fastapi==0.104.1
 uvicorn[standard]==0.24.0  # Server to run FastAPI
+sse-starlette==1.6.5       # Server-Sent Events for streaming
 
 # WebSocket Support  
 python-socketio==5.10.0     # WebSocket library

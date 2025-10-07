@@ -12,17 +12,28 @@ try:
 except ImportError:
     from opportunity_detector import OpportunityDetector
 
-# Import from the same directory - use absolute import for direct execution
+# Import from the same directory
 try:
     from .redis_client import redis_client
     from .dummy_transcript import dummy_transcript_service
+    from .workflow_api import router as workflow_router
 except ImportError:
-    # Fallback for direct execution
-    from redis_client import redis_client
-    from dummy_transcript import dummy_transcript_service
+    try:
+        # Fallback for direct execution
+        from redis_client import redis_client
+        from dummy_transcript import dummy_transcript_service
+        from workflow_api import router as workflow_router
+    except ImportError:
+        # Final fallback with app prefix
+        from app.redis_client import redis_client
+        from app.dummy_transcript import dummy_transcript_service
+        from app.workflow_api import router as workflow_router
 
 app = FastAPI(title="Nexhelm POC")
 detector = OpportunityDetector()
+
+# Include workflow router for agentic workflows
+app.include_router(workflow_router)
 
 app.add_middleware(
     CORSMiddleware,
