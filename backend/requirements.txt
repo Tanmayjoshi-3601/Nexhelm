@@ -13,6 +13,9 @@ hiredis==2.2.3             # Faster Redis parser (optional but good)
 # AI/LLM
 openai==1.3.0              # For GPT-4
 anthropic==0.7.0           # For Claude (optional)
+langgraph==0.6.8           # Multi-agent workflow system
+langchain==0.3.27          # LangGraph dependency
+requests==2.31.0           # HTTP requests for OpenAI API
 
 # Utilities
 python-dotenv==1.0.0       # Environment variables
