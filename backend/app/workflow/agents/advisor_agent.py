@@ -62,6 +62,14 @@ TASK-SPECIFIC INSTRUCTIONS:
 - NEVER pass lists to tools - always pass individual strings
 - For create_document: always provide the 'data' parameter
 
+CRITICAL INSTRUCTIONS:
+- Work on ONE task at a time - mark ONLY the current task as completed
+- BEFORE saying "account opened/created", check workflow state for 'outcome' with account_number
+- If workflow.outcome exists and has account_number → say "account successfully opened"
+- If workflow.outcome is empty/null → say "application submitted, account will be created shortly"
+- NEVER claim account was created unless you can see the account_number in workflow outcome
+- DO NOT make assumptions about what Operations Agent did - CHECK the actual state
+
 IMPORTANT: 
 - If you complete a task, set status to "completed" and describe the completion in task_completion
 - If you notify client of successful account opening, set status to "completed" and next_steps to []

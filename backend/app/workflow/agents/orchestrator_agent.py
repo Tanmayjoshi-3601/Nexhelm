@@ -17,27 +17,31 @@ class OrchestratorAgent(BaseAgent):
     """
     
     def __init__(self):
-        system_prompt = """You are an experienced Workflow Orchestrator for Nexhelm, a financial advisory firm. Your role is to analyze client requests and create comprehensive workflow plans.
+        system_prompt = """You are an intelligent Workflow Orchestrator for Nexhelm, a financial advisory firm. You autonomously design workflows by understanding business processes, compliance requirements, and client needs.
 
-CORE RESPONSIBILITIES:
-- Analyze client requests and determine required tasks
-- Create detailed workflow plans with proper task sequencing
-- Assign tasks to appropriate agents (Advisor or Operations)
-- Set up proper dependencies between tasks
-- Consider compliance and regulatory requirements
-- Optimize workflow efficiency and client experience
+YOUR INTELLIGENCE & AUTONOMY:
+- Analyze requests and determine the optimal sequence of tasks
+- Understand financial workflows (account opening, transfers, compliance, etc.)
+- Make intelligent decisions about task assignment and dependencies
+- Adapt to different request types and client contexts
+- Balance efficiency, compliance, and client experience
 
-AVAILABLE TOOLS:
-- get_client_info: Get comprehensive client information
-- check_eligibility: Check client eligibility for financial products
+AVAILABLE TOOLS (for planning):
+- get_client_info: Understand client context before planning
+- check_eligibility: Verify feasibility during planning
 
-WORKFLOW PLANNING PRINCIPLES:
-- Always start with eligibility verification for financial products
-- Ensure proper task dependencies (e.g., verify eligibility before sending forms)
-- Assign client-facing tasks to Advisor Agent
-- Assign backend/compliance tasks to Operations Agent
-- Consider potential blockers and create contingency plans
-- Follow regulatory requirements and compliance procedures
+AGENT CAPABILITIES (for task assignment):
+- **Advisor Agent**: Client communication, forms, advice, notifications, relationship management
+- **Operations Agent**: Backend operations, compliance, validation, account management, system tasks
+
+PLANNING APPROACH:
+- Think through the business logic: What needs to happen for this request to succeed?
+- Create clear, actionable tasks (describe WHAT, let agents decide HOW)
+- Set up logical dependencies and sequencing
+- Consider compliance and risk factors
+- Assign tasks based on agent capabilities
+
+NOTE: Our validation system checks for critical missing steps (like account creation). Focus on intelligent workflow design.
 
 RESPONSE FORMAT:
 Always respond in JSON format with the following structure:
@@ -107,15 +111,39 @@ INSTRUCTIONS:
 5. Estimate durations and set priorities
 6. Define success criteria for the workflow
 
-For an IRA opening request, typical tasks might include:
-- Eligibility verification (assign to operations_agent)
-- Form preparation and sending (assign to advisor_agent)
-- Document collection and validation (assign to operations_agent)
-- Account creation (assign to operations_agent)
-- Client notification (assign to advisor_agent)
+PRINCIPLES FOR WORKFLOW PLANNING:
 
-IMPORTANT: Client-facing tasks (forms, notifications, communications) should be assigned to advisor_agent.
-Backend tasks (eligibility, validation, account creation) should be assigned to operations_agent.
+1. **Analyze the Request Autonomously**: 
+   - Understand what the client wants to achieve
+   - Determine the logical sequence of steps needed
+   - Consider compliance, risk, and client experience
+
+2. **Task Assignment Guidelines**:
+   - Client-facing tasks (communications, forms, advice) → advisor_agent
+   - Backend/compliance tasks (verification, validation, account operations) → operations_agent
+   - Consider dependencies and logical flow
+
+3. **Critical Business Requirements** (for account opening requests):
+   - Financial products require eligibility verification
+   - Accounts cannot be opened without proper validation
+   - Clients must be notified of outcomes
+   - Compliance and regulatory requirements must be met
+
+4. **Task Quality**:
+   - Tasks should be clear and actionable (but don't dictate exact tools - let agents decide)
+   - Break complex operations into logical steps
+   - Ensure proper sequencing and dependencies
+
+5. **Autonomy vs. Safety**:
+   - Use your intelligence to create the best workflow
+   - Our validation system will check for critical missing steps (like account creation)
+   - Focus on WHAT needs to happen, not HOW (agents will decide the HOW)
+
+EXAMPLE (for opening a Roth IRA):
+Think: "Client wants a Roth IRA. They need: eligibility check → forms → validation → account creation → notification"
+Create tasks that reflect this logic, but let the agents autonomously decide which tools to use.
+
+IMPORTANT: You are an intelligent orchestrator, not a script executor. Design workflows that make business sense.
 
 Create a realistic, comprehensive workflow plan."""
 
@@ -154,6 +182,9 @@ Create a realistic, comprehensive workflow plan."""
                 "estimated_duration": task.get("estimated_duration", "unknown")
             }
             formatted_tasks.append(formatted_task)
+        
+        # CRITICAL: Validate and enforce required tasks based on request type
+        formatted_tasks = self._validate_and_enforce_tasks(formatted_tasks, request_type)
         
         # Update state with generated tasks
         state["tasks"] = formatted_tasks
@@ -327,3 +358,85 @@ Create a realistic, comprehensive workflow plan."""
                 "estimated_duration": "5-10 minutes"
             }
         ]
+    
+    def _validate_and_enforce_tasks(self, tasks: List[Dict[str, Any]], request_type: str) -> List[Dict[str, Any]]:
+        """
+        Validate task list and ensure critical tasks are present based on request type.
+        This is a CRITICAL method to ensure LLM doesn't forget important tasks.
+        
+        Args:
+            tasks: List of tasks from LLM
+            request_type: The type of request (e.g., "open_roth_ira")
+            
+        Returns:
+            Validated and corrected task list
+        """
+        print(f"🔍 {self.name.upper()}: Validating task list for {request_type}")
+        
+        # For IRA opening requests, ensure account creation task exists
+        if "ira" in request_type.lower() or "open" in request_type.lower():
+            
+            # Check if account creation task exists (look for various patterns)
+            has_account_creation = any(
+                (
+                    ("open_account" in task.get("description", "").lower()) or
+                    ("create" in task.get("description", "").lower() and "account" in task.get("description", "").lower()) or
+                    ("open" in task.get("description", "").lower() and "account" in task.get("description", "").lower())
+                ) and
+                task.get("owner") == "operations_agent"
+                for task in tasks
+            )
+            
+            if not has_account_creation:
+                print(f"⚠️  {self.name.upper()}: CRITICAL - Account creation task missing! Adding it now...")
+                
+                # Find the last validation task to insert account creation after
+                validation_task_index = -1
+                for i, task in enumerate(tasks):
+                    if "validat" in task.get("description", "").lower():
+                        validation_task_index = i
+                
+                # Find the last operations task to get proper dependency
+                last_ops_task_id = None
+                for task in tasks:
+                    if task.get("owner") == "operations_agent":
+                        last_ops_task_id = task.get("id")
+                
+                # Create account creation task with explicit tool hint
+                account_type = "roth_ira" if "roth" in request_type.lower() else "traditional_ira"
+                account_task_id = f"task_{len(tasks) + 1}"
+                account_creation_task = {
+                    "id": account_task_id,
+                    "description": f"Execute open_account tool to create {account_type} account for the client",
+                    "owner": "operations_agent",
+                    "status": "pending",
+                    "dependencies": [last_ops_task_id] if last_ops_task_id else [],
+                    "result": None,
+                    "priority": "high",
+                    "estimated_duration": "5-10 minutes"
+                }
+                
+                # Insert after validation task, or at position before last task
+                insert_position = validation_task_index + 1 if validation_task_index >= 0 else len(tasks) - 1
+                tasks.insert(insert_position, account_creation_task)
+                
+                # Update notification task dependencies if it exists
+                for task in tasks:
+                    if "notif" in task.get("description", "").lower() and task.get("owner") == "advisor_agent":
+                        task["dependencies"] = [account_task_id]
+                
+                print(f"✅ {self.name.upper()}: Added account creation task at position {insert_position}")
+        
+        # Re-number task IDs to be sequential
+        for i, task in enumerate(tasks, 1):
+            old_id = task["id"]
+            new_id = f"task_{i}"
+            task["id"] = new_id
+            
+            # Update dependencies to use new IDs
+            for t in tasks:
+                if old_id in t.get("dependencies", []):
+                    t["dependencies"] = [new_id if dep == old_id else dep for dep in t["dependencies"]]
+        
+        print(f"✅ {self.name.upper()}: Task validation complete - {len(tasks)} tasks")
+        return tasks

@@ -51,26 +51,50 @@ Always respond in JSON format with the following structure:
     "next_steps": ["What should happen next in the workflow"],
     "status": "continue|completed|failed|blocked",
     "compliance_notes": "Any compliance or regulatory considerations",
-    "tools_to_use": [{"tool": "tool_name", "params": {"param1": "value1"}}],
+    "tools_to_use": [{"tool": "tool_name", "params": {"param1": "value1"}}],  <-- CRITICAL: Use ONLY ONE tool per task!
     "blockers": ["Any issues that need to be resolved"],
     "task_completion": "Describe what task you completed (if any)"
 }
 
-TASK-SPECIFIC INSTRUCTIONS:
-- "verify eligibility" or "check eligibility" → ONLY use check_eligibility tool, DO NOT create accounts
-- "validate documents" or "validate document" → ONLY use validate_document tool, DO NOT create accounts  
-- "create account" or "open account" → Your job is to create the account. Use open_account tool exactly once.
-- "collect documents" → ONLY use get_document tool, DO NOT create accounts
-- Each task should use ONLY the appropriate tool for that specific task
-- NEVER pass lists to tools - always pass individual strings
-- For get_document: use doc_type as a single string, not a list
+CRITICAL: In tools_to_use, include ONLY ONE tool - the one that matches the current task!
+
+INTELLIGENT TOOL SELECTION:
+You have access to these tools - choose the RIGHT ONE based on what the task requires:
+
+1. **check_eligibility(client_id, product_type)**: Verify if client qualifies for a financial product
+2. **validate_document(client_id, doc_type)**: Check if a document is valid and complete
+3. **get_document(client_id, doc_type)**: Retrieve a specific document
+4. **open_account(client_id, account_type)**: Create a new financial account
+5. **get_client_info(client_id)**: Get comprehensive client information
+6. **create_document/update_document**: Manage client documents
+
+DECISION MAKING GUIDELINES:
+- Read the task description carefully and understand the intent
+- Choose the tool that BEST accomplishes the task objective
+- For account creation tasks: use open_account (account_type: "roth_ira", "traditional_ira", etc.)
+- For validation tasks: use validate_document with specific doc types like "driver's license", "tax return", "IRA application"
+- For document retrieval: use get_document
+- Use ONLY ONE tool per task execution
+
+IMPORTANT CONSTRAINTS:
+- NEVER pass lists or arrays to tools - always use single string values
+- For document types, use specific names: "driver's license", "tax return", "IRA application"
+- Avoid generic names like "documents", "submitted_documents", "required_documents"
+- Always include required parameters: client_id is almost always needed
+
+CRITICAL ERROR HANDLING RULES:
+- BEFORE creating an account: Check if client already has this account type
+- If a tool returns {"success": false} or {"error": "..."} → STOP immediately and create a BLOCKER
+- If check_eligibility returns {"eligible": false} → DO NOT proceed, set status to "blocked"
+- If validate_document returns {"valid": false} → DO NOT proceed, set status to "blocked"
+- NEVER create accounts for ineligible clients or when documents are invalid
+- If account already exists → set status to "blocked", DO NOT mark task as completed
 
 IMPORTANT: 
-- If you complete a task, set status to "completed" and describe the completion in task_completion
+- Work on ONE task at a time - mark ONLY the current task as completed
+- Check tool results for errors BEFORE proceeding to next tool
 - If you successfully open an account, set status to "completed" and next_steps to []
-- If all tasks are done, set status to "completed" and next_steps to []
 - Use exact parameter names: client_id, doc_type, product_type, account_type
-- When account is opened successfully, the workflow should end immediately
 - DO NOT use multiple tools for a single task - use only the tool that matches the task description
 
 Remember: You are responsible for ensuring all operations meet regulatory standards and company policies."""
@@ -128,9 +152,14 @@ Remember: Focus on compliance, accuracy, and ensuring all regulatory requirement
         # Parse the response
         parsed_response = self.parse_agent_response(response)
         
-        # Execute any tools specified
+        # Execute any tools specified - CRITICAL: Execute ONLY the first tool per task
         if "tools_to_use" in parsed_response:
-            for tool_call in parsed_response["tools_to_use"]:
+            # Limit to first tool only to enforce ONE TOOL PER TASK rule
+            tools_list = parsed_response["tools_to_use"]
+            if len(tools_list) > 1:
+                print(f"⚠️  {self.name.upper()}: LLM requested {len(tools_list)} tools, but will execute ONLY the first one per task")
+            
+            for tool_call in tools_list[:1]:  # Execute ONLY the first tool
                 tool_name = tool_call["tool"]
                 tool_params = tool_call.get("params", {})
                 
@@ -138,8 +167,65 @@ Remember: Focus on compliance, accuracy, and ensuring all regulatory requirement
                 result = self.execute_tool(tool_name, **tool_params)
                 print(f"🔧 {self.name.upper()}: Tool result: {result}")
                 
+                # CRITICAL: Check for errors in tool results
+                if result.get("success") == False or "error" in result:
+                    error_msg = result.get("error") or result.get("message", "Unknown error")
+                    print(f"❌ {self.name.upper()}: Tool '{tool_name}' failed: {error_msg}")
+                    
+                    # Create blocker and stop execution
+                    self.add_blocker_to_state(state, f"{tool_name} failed: {error_msg}")
+                    
+                    # Mark task as failed
+                    for task in state["tasks"]:
+                        if task["owner"] == "operations_agent" and task["status"] == "pending":
+                            task["status"] = "failed"
+                            task["result"] = f"Failed: {error_msg}"
+                            print(f"❌ {self.name.upper()}: Marked task '{task['id']}' as failed")
+                            break
+                    
+                    state["status"] = "blocked"
+                    state["next_actions"] = []
+                    return state
+                
+                # Check eligibility tool - stop if not eligible
+                if tool_name == "check_eligibility":
+                    if result.get("eligible") == False:
+                        reason = result.get("reason", "Eligibility check failed")
+                        print(f"❌ {self.name.upper()}: Client not eligible: {reason}")
+                        self.add_blocker_to_state(state, f"Eligibility failed: {reason}")
+                        
+                        for task in state["tasks"]:
+                            if task["owner"] == "operations_agent" and task["status"] == "pending":
+                                task["status"] = "failed"
+                                task["result"] = f"Ineligible: {reason}"
+                                print(f"❌ {self.name.upper()}: Marked task '{task['id']}' as failed")
+                                break
+                        
+                        state["status"] = "blocked"
+                        state["next_actions"] = []
+                        return state
+                
+                # Check validation tool - stop if invalid
+                if tool_name == "validate_document":
+                    if result.get("valid") == False:
+                        errors = result.get("errors", ["Validation failed"])
+                        error_msg = "; ".join(errors)
+                        print(f"❌ {self.name.upper()}: Document validation failed: {error_msg}")
+                        self.add_blocker_to_state(state, f"Document validation failed: {error_msg}")
+                        
+                        for task in state["tasks"]:
+                            if task["owner"] == "operations_agent" and task["status"] == "pending":
+                                task["status"] = "failed"
+                                task["result"] = f"Validation failed: {error_msg}"
+                                print(f"❌ {self.name.upper()}: Marked task '{task['id']}' as failed")
+                                break
+                        
+                        state["status"] = "blocked"
+                        state["next_actions"] = []
+                        return state
+                
                 # Check if account was successfully created
-                if tool_name == "open_account" and result.get("success") and "account" in result:
+                if tool_name == "open_account" and result.get("success") == True and "account" in result:
                     account_info = result["account"]
                     if "account_number" in account_info:
                         print(f"🎉 {self.name.upper()}: Account created successfully! {account_info['account_number']}")
@@ -151,27 +237,6 @@ Remember: Focus on compliance, accuracy, and ensuring all regulatory requirement
                             "status": account_info["status"],
                             "created_at": account_info["created_at"]
                         }
-                    else:
-                        print(f"⚠️ {self.name.upper()}: Account creation returned error: {account_info.get('error', 'Unknown error')}")
-                elif tool_name == "open_account" and result.get("success") and "error" in result:
-                    print(f"⚠️ {self.name.upper()}: Account creation failed: {result['error']}")
-                    
-                    # Mark current task as completed (don't end workflow yet)
-                    for task in state["tasks"]:
-                        if task["owner"] == "operations_agent" and task["status"] == "pending":
-                            task["status"] = "completed"
-                            task["result"] = f"Account {account_info['account_number']} created successfully"
-                            break
-                    
-                    # Set next action for advisor agent to notify client
-                    state["next_actions"] = [{
-                        "agent": "advisor_agent",
-                        "action": "notify_client_account_opened",
-                        "priority": "high"
-                    }]
-                    
-                    print(f"🎉 {self.name.upper()}: Account created successfully! Continuing workflow...")
-                    return state
         
         # Add message to state
         reasoning = parsed_response.get("reasoning", "No reasoning provided")
@@ -183,12 +248,14 @@ Remember: Focus on compliance, accuracy, and ensuring all regulatory requirement
         
         # Handle task completion if agent completed a task
         if "task_completion" in parsed_response and parsed_response["task_completion"]:
-            # Find and mark the current task as completed
+            # Find and mark ONLY THE FIRST pending task as completed
+            task_marked = False
             for task in state["tasks"]:
-                if task["owner"] == "operations_agent" and task["status"] == "pending":
+                if task["owner"] == "operations_agent" and task["status"] == "pending" and not task_marked:
                     task["status"] = "completed"
                     task["result"] = parsed_response["task_completion"]
                     print(f"🤖 {self.name.upper()}: Marked task '{task['id']}' as completed")
+                    task_marked = True
                     break
         
         # Handle compliance notes
@@ -238,28 +305,32 @@ Remember: Focus on compliance, accuracy, and ensuring all regulatory requirement
         # Update workflow status based on agent's assessment
         agent_status = parsed_response.get("status", "continue")
         if agent_status == "completed":
-            # Mark current task as completed before setting workflow status
+            # Mark ONLY ONE task as completed
+            task_marked = False
             for task in state["tasks"]:
-                if task["owner"] == "operations_agent" and task["status"] == "pending":
+                if task["owner"] == "operations_agent" and task["status"] == "pending" and not task_marked:
                     task["status"] = "completed"
                     task["result"] = parsed_response.get("task_completion", "Task completed by operations agent")
                     print(f"🤖 {self.name.upper()}: Marked task '{task['id']}' as completed")
+                    task_marked = True
                     break
             # Don't set workflow status to completed here - let routing system handle it
         elif agent_status == "failed" or agent_status == "blocked":
             state["status"] = "failed"
         
-        # If agent is continuing but has done work, mark the current task as completed
+        # If agent is continuing but has done work, mark ONE task as completed
         if agent_status == "continue" and "tools_to_use" in parsed_response and parsed_response["tools_to_use"]:
             # Check if we successfully executed tools and should mark task as completed
             tools_executed = parsed_response.get("tools_to_use", [])
             if tools_executed:
-                # Mark the first pending task as completed
+                # Mark ONLY THE FIRST pending task as completed
+                task_marked = False
                 for task in state["tasks"]:
-                    if task["owner"] == "operations_agent" and task["status"] == "pending":
+                    if task["owner"] == "operations_agent" and task["status"] == "pending" and not task_marked:
                         task["status"] = "completed"
                         task["result"] = f"Completed task using tools: {[t.get('tool', 'unknown') for t in tools_executed]}"
                         print(f"🤖 {self.name.upper()}: Marked task '{task['id']}' as completed after tool execution")
+                        task_marked = True
                         break
         
         # Update timestamp

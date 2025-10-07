@@ -12,7 +12,7 @@ class SimulatedDocumentStore:
     """
     
     def __init__(self):
-        """Initialize with sample data for john_smith_123"""
+        """Initialize with sample data for john_smith_123 and test clients"""
         self.documents = {
             "john_smith_123": {
                 "drivers_license": {
@@ -26,9 +26,26 @@ class SimulatedDocumentStore:
                     "year": 2023
                 },
                 "ira_application": {
-                    "status": "pending",
-                    "signature_page3": False,
-                    "submitted": False
+                    "status": "valid",
+                    "signature_complete": True,
+                    "submitted": True
+                }
+            },
+            "test_client_complete": {
+                "drivers_license": {
+                    "status": "valid",
+                    "uploaded": True,
+                    "verified": True
+                },
+                "tax_return_2023": {
+                    "status": "valid",
+                    "income": 120000,
+                    "year": 2023
+                },
+                "ira_application": {
+                    "status": "valid",
+                    "signature_complete": True,
+                    "submitted": True
                 }
             }
         }
@@ -38,13 +55,13 @@ class SimulatedDocumentStore:
         doc_type_lower = doc_type.lower().strip()
         
         # Map common variations to stored document names
-        if "driver" in doc_type_lower and "license" in doc_type_lower:
+        if "driver" in doc_type_lower or "license" in doc_type_lower:
             return "drivers_license"
-        elif "tax" in doc_type_lower and "return" in doc_type_lower:
+        elif "tax" in doc_type_lower or "return" in doc_type_lower or "income" in doc_type_lower:
             return "tax_return_2023"
-        elif "ira" in doc_type_lower and "application" in doc_type_lower:
+        elif "application" in doc_type_lower or ("ira" in doc_type_lower and "form" in doc_type_lower):
             return "ira_application"
-        elif "roth" in doc_type_lower and "ira" in doc_type_lower and "application" in doc_type_lower:
+        elif doc_type_lower in ["roth_ira", "traditional_ira", "roth ira", "traditional ira"]:
             return "ira_application"
         else:
             # Return original if no mapping found
@@ -87,6 +104,13 @@ class SimulatedCRM:
                 "email": "john@example.com",
                 "existing_accounts": ["checking", "brokerage"],
                 "income": 145000
+            },
+            "test_client_complete": {
+                "name": "Test Client Complete",
+                "age": 35,
+                "email": "test@example.com",
+                "existing_accounts": [],
+                "income": 120000
             }
         }
     

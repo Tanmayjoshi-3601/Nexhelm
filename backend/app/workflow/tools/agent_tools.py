@@ -120,10 +120,23 @@ class AgentTools:
             account_type: Type of account (e.g., 'roth_ira', 'traditional_ira')
             
         Returns:
-            Dict containing account information
+            Dict containing account information or error
         """
         result = self.account_system.open_account(client_id, account_type)
-        return {"success": True, "account": result}
+        
+        # Check if the account system returned an error
+        if "error" in result:
+            return {
+                "success": False,
+                "error": result["error"],
+                "message": result["error"]
+            }
+        
+        return {
+            "success": True,
+            "account": result,
+            "message": f"Successfully created {account_type} account for client {client_id}"
+        }
     
     def get_account(self, account_number: str) -> Dict[str, Any]:
         """
