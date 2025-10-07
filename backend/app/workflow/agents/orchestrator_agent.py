@@ -108,11 +108,14 @@ INSTRUCTIONS:
 6. Define success criteria for the workflow
 
 For an IRA opening request, typical tasks might include:
-- Eligibility verification
-- Form preparation and sending
-- Document collection and validation
-- Account creation
-- Client notification
+- Eligibility verification (assign to operations_agent)
+- Form preparation and sending (assign to advisor_agent)
+- Document collection and validation (assign to operations_agent)
+- Account creation (assign to operations_agent)
+- Client notification (assign to advisor_agent)
+
+IMPORTANT: Client-facing tasks (forms, notifications, communications) should be assigned to advisor_agent.
+Backend tasks (eligibility, validation, account creation) should be assigned to operations_agent.
 
 Create a realistic, comprehensive workflow plan."""
 

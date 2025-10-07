@@ -56,12 +56,22 @@ Always respond in JSON format with the following structure:
     "task_completion": "Describe what task you completed (if any)"
 }
 
+TASK-SPECIFIC INSTRUCTIONS:
+- "verify eligibility" or "check eligibility" → ONLY use check_eligibility tool, DO NOT create accounts
+- "validate documents" or "validate document" → ONLY use validate_document tool, DO NOT create accounts  
+- "create account" or "open account" → Your job is to create the account. Use open_account tool exactly once.
+- "collect documents" → ONLY use get_document tool, DO NOT create accounts
+- Each task should use ONLY the appropriate tool for that specific task
+- NEVER pass lists to tools - always pass individual strings
+- For get_document: use doc_type as a single string, not a list
+
 IMPORTANT: 
 - If you complete a task, set status to "completed" and describe the completion in task_completion
 - If you successfully open an account, set status to "completed" and next_steps to []
 - If all tasks are done, set status to "completed" and next_steps to []
 - Use exact parameter names: client_id, doc_type, product_type, account_type
 - When account is opened successfully, the workflow should end immediately
+- DO NOT use multiple tools for a single task - use only the tool that matches the task description
 
 Remember: You are responsible for ensuring all operations meet regulatory standards and company policies."""
 
@@ -131,15 +141,20 @@ Remember: Focus on compliance, accuracy, and ensuring all regulatory requirement
                 # Check if account was successfully created
                 if tool_name == "open_account" and result.get("success") and "account" in result:
                     account_info = result["account"]
-                    print(f"🎉 {self.name.upper()}: Account created successfully! {account_info['account_number']}")
-                    
-                    # Set workflow outcome
-                    state["outcome"] = {
-                        "account_number": account_info["account_number"],
-                        "account_type": account_info.get("account_type", "roth_ira"),
-                        "status": account_info["status"],
-                        "created_at": account_info["created_at"]
-                    }
+                    if "account_number" in account_info:
+                        print(f"🎉 {self.name.upper()}: Account created successfully! {account_info['account_number']}")
+                        
+                        # Set workflow outcome
+                        state["outcome"] = {
+                            "account_number": account_info["account_number"],
+                            "account_type": account_info.get("account_type", "roth_ira"),
+                            "status": account_info["status"],
+                            "created_at": account_info["created_at"]
+                        }
+                    else:
+                        print(f"⚠️ {self.name.upper()}: Account creation returned error: {account_info.get('error', 'Unknown error')}")
+                elif tool_name == "open_account" and result.get("success") and "error" in result:
+                    print(f"⚠️ {self.name.upper()}: Account creation failed: {result['error']}")
                     
                     # Mark current task as completed (don't end workflow yet)
                     for task in state["tasks"]:
@@ -223,9 +238,29 @@ Remember: Focus on compliance, accuracy, and ensuring all regulatory requirement
         # Update workflow status based on agent's assessment
         agent_status = parsed_response.get("status", "continue")
         if agent_status == "completed":
-            state["status"] = "completed"
+            # Mark current task as completed before setting workflow status
+            for task in state["tasks"]:
+                if task["owner"] == "operations_agent" and task["status"] == "pending":
+                    task["status"] = "completed"
+                    task["result"] = parsed_response.get("task_completion", "Task completed by operations agent")
+                    print(f"🤖 {self.name.upper()}: Marked task '{task['id']}' as completed")
+                    break
+            # Don't set workflow status to completed here - let routing system handle it
         elif agent_status == "failed" or agent_status == "blocked":
             state["status"] = "failed"
+        
+        # If agent is continuing but has done work, mark the current task as completed
+        if agent_status == "continue" and "tools_to_use" in parsed_response and parsed_response["tools_to_use"]:
+            # Check if we successfully executed tools and should mark task as completed
+            tools_executed = parsed_response.get("tools_to_use", [])
+            if tools_executed:
+                # Mark the first pending task as completed
+                for task in state["tasks"]:
+                    if task["owner"] == "operations_agent" and task["status"] == "pending":
+                        task["status"] = "completed"
+                        task["result"] = f"Completed task using tools: {[t.get('tool', 'unknown') for t in tools_executed]}"
+                        print(f"🤖 {self.name.upper()}: Marked task '{task['id']}' as completed after tool execution")
+                        break
         
         # Update timestamp
         state["updated_at"] = datetime.now().isoformat()

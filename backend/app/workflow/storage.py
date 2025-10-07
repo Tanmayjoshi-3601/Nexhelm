@@ -33,10 +33,28 @@ class SimulatedDocumentStore:
             }
         }
     
+    def _normalize_doc_type(self, doc_type: str) -> str:
+        """Normalize document type names to match stored documents"""
+        doc_type_lower = doc_type.lower().strip()
+        
+        # Map common variations to stored document names
+        if "driver" in doc_type_lower and "license" in doc_type_lower:
+            return "drivers_license"
+        elif "tax" in doc_type_lower and "return" in doc_type_lower:
+            return "tax_return_2023"
+        elif "ira" in doc_type_lower and "application" in doc_type_lower:
+            return "ira_application"
+        elif "roth" in doc_type_lower and "ira" in doc_type_lower and "application" in doc_type_lower:
+            return "ira_application"
+        else:
+            # Return original if no mapping found
+            return doc_type
+    
     def get_document(self, client_id: str, doc_type: str) -> Optional[dict]:
         """Get a specific document for a client"""
-        if client_id in self.documents and doc_type in self.documents[client_id]:
-            return self.documents[client_id][doc_type]
+        normalized_doc_type = self._normalize_doc_type(doc_type)
+        if client_id in self.documents and normalized_doc_type in self.documents[client_id]:
+            return self.documents[client_id][normalized_doc_type]
         return None
     
     def update_document(self, client_id: str, doc_type: str, data: dict) -> bool:
@@ -44,7 +62,8 @@ class SimulatedDocumentStore:
         if client_id not in self.documents:
             self.documents[client_id] = {}
         
-        self.documents[client_id][doc_type] = data
+        normalized_doc_type = self._normalize_doc_type(doc_type)
+        self.documents[client_id][normalized_doc_type] = data
         return True
     
     def list_documents(self, client_id: str) -> List[str]:
@@ -95,6 +114,13 @@ class SimulatedAccountSystem:
     
     def open_account(self, client_id: str, account_type: str) -> dict:
         """Open a new account for a client"""
+        # Check if client already has an account of this type
+        for account in self.accounts.values():
+            if account["client_id"] == client_id and account["account_type"] == account_type:
+                return {
+                    "error": f"Client {client_id} already has a {account_type} account: {account['account_number']}"
+                }
+        
         account_number = f"{account_type.upper()}-{self.counter}"
         self.counter += 1
         

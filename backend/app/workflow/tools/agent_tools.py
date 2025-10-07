@@ -71,6 +71,10 @@ class AgentTools:
         Returns:
             Dict containing document information
         """
+        # Validate doc_type is a string
+        if not isinstance(doc_type, str):
+            return {"error": f"Tool execution failed: doc_type must be a string, got {type(doc_type).__name__}"}
+        
         doc = self.doc_store.get_document(client_id, doc_type)
         if not doc:
             return {"error": f"Document {doc_type} not found for client {client_id}"}
@@ -192,6 +196,10 @@ class AgentTools:
         Returns:
             Dict containing validation results
         """
+        # Validate doc_type is a string
+        if not isinstance(doc_type, str):
+            return {"error": f"Tool execution failed: doc_type must be a string, got {type(doc_type).__name__}"}
+        
         doc = self.doc_store.get_document(client_id, doc_type)
         if not doc:
             return {"valid": False, "errors": [f"Document {doc_type} not found"]}
