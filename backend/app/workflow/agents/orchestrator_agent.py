@@ -30,16 +30,32 @@ AVAILABLE TOOLS (for planning):
 - get_client_info: Understand client context before planning
 - check_eligibility: Verify feasibility during planning
 
-AGENT CAPABILITIES (for task assignment):
-- **Advisor Agent**: Client communication, forms, advice, notifications, relationship management
-- **Operations Agent**: Backend operations, compliance, validation, account management, system tasks
+AGENT CAPABILITIES (for intelligent task assignment):
+
+**Advisor Agent** - Client-Facing, Relationship-Driven:
+- Client communication (explanations, guidance, updates)
+- Document requests and collection from clients
+- Form assistance and submission guidance
+- Progress notifications and status updates
+- Client education and advice
+- Relationship management
+WHEN TO USE: Tasks requiring client interaction, empathy, or communication
+
+**Operations Agent** - Backend, Compliance-Driven:
+- Eligibility checks and compliance validation
+- Document verification and authentication
+- Account creation and backend operations
+- System integrations and data updates
+- Risk assessments and regulatory checks
+WHEN TO USE: Tasks requiring system access, compliance checks, or backend operations
 
 PLANNING APPROACH:
 - Think through the business logic: What needs to happen for this request to succeed?
 - Create clear, actionable tasks (describe WHAT, let agents decide HOW)
+- **Balance task distribution**: Mix advisor (client-facing) and operations (backend) appropriately
 - Set up logical dependencies and sequencing
 - Consider compliance and risk factors
-- Assign tasks based on agent capabilities
+- Assign tasks based on WHO interacts with WHAT (client vs. system)
 
 NOTE: Our validation system checks for critical missing steps (like account creation). Focus on intelligent workflow design.
 
@@ -185,6 +201,9 @@ Create a realistic, comprehensive workflow plan."""
         
         # CRITICAL: Validate and enforce required tasks based on request type
         formatted_tasks = self._validate_and_enforce_tasks(formatted_tasks, request_type)
+        
+        # CRITICAL: Ensure proper task dependencies for sequential execution
+        formatted_tasks = self._ensure_sequential_dependencies(formatted_tasks)
         
         # Update state with generated tasks
         state["tasks"] = formatted_tasks
@@ -453,4 +472,74 @@ Create a realistic, comprehensive workflow plan."""
                     t["dependencies"] = [new_id if dep == old_id else dep for dep in t["dependencies"]]
         
         print(f"✅ {self.name.upper()}: Task validation complete - {len(tasks)} tasks")
+        return tasks
+    
+    def _ensure_sequential_dependencies(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Ensure tasks have proper sequential dependencies to maintain logical execution order.
+        This doesn't override all dependencies, but ensures critical sequencing is maintained.
+        
+        Rules:
+        1. First task has no dependencies
+        2. Each subsequent task depends on the previous task (unless it has specific dependencies set)
+        3. Final notification task depends on all preceding tasks being complete
+        
+        Args:
+            tasks: List of tasks from LLM (may have incomplete dependencies)
+            
+        Returns:
+            Tasks with properly enforced dependencies
+        """
+        if not tasks or len(tasks) <= 1:
+            return tasks
+        
+        print(f"🔗 {self.name.upper()}: Ensuring proper task dependencies for sequential execution")
+        
+        # Strategy: Build a dependency chain where each task depends on previous task(s)
+        # Exception: If LLM explicitly set dependencies, we respect them but ensure they're valid
+        
+        for i, task in enumerate(tasks):
+            if i == 0:
+                # First task has no dependencies
+                task["dependencies"] = []
+                print(f"   - {task['id']}: No dependencies (first task)")
+            else:
+                # Check if LLM set explicit dependencies
+                existing_deps = task.get("dependencies", [])
+                
+                # If no dependencies or empty, make it depend on previous task
+                if not existing_deps:
+                    previous_task_id = tasks[i-1]["id"]
+                    task["dependencies"] = [previous_task_id]
+                    print(f"   - {task['id']}: Added dependency on {previous_task_id} (sequential)")
+                else:
+                    # Validate existing dependencies - ensure they reference valid task IDs
+                    valid_task_ids = {t["id"] for t in tasks[:i]}  # Only tasks before current one
+                    validated_deps = [dep for dep in existing_deps if dep in valid_task_ids]
+                    
+                    if not validated_deps:
+                        # If all dependencies were invalid, default to previous task
+                        previous_task_id = tasks[i-1]["id"]
+                        task["dependencies"] = [previous_task_id]
+                        print(f"   - {task['id']}: Invalid dependencies, using {previous_task_id}")
+                    else:
+                        task["dependencies"] = validated_deps
+                        print(f"   - {task['id']}: Validated dependencies: {validated_deps}")
+        
+        # Special handling for notification tasks: ensure they depend on account creation
+        for i, task in enumerate(tasks):
+            if "notif" in task.get("description", "").lower() and task.get("owner") == "advisor_agent":
+                # Find the account creation task
+                account_task_id = None
+                for t in tasks[:i]:  # Look at tasks before this one
+                    if ("open" in t.get("description", "").lower() and "account" in t.get("description", "").lower()) or \
+                       ("create" in t.get("description", "").lower() and "account" in t.get("description", "").lower()):
+                        account_task_id = t["id"]
+                        break
+                
+                if account_task_id and account_task_id not in task["dependencies"]:
+                    task["dependencies"] = [account_task_id]
+                    print(f"   - {task['id']}: Notification task now depends on account creation ({account_task_id})")
+        
+        print(f"✅ {self.name.upper()}: Task dependencies configured for proper sequencing")
         return tasks

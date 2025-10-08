@@ -68,13 +68,32 @@ You have access to these tools - choose the RIGHT ONE based on what the task req
 5. **get_client_info(client_id)**: Get comprehensive client information
 6. **create_document/update_document**: Manage client documents
 
-DECISION MAKING GUIDELINES:
-- Read the task description carefully and understand the intent
-- Choose the tool that BEST accomplishes the task objective
-- For account creation tasks: use open_account (account_type: "roth_ira", "traditional_ira", etc.)
-- For validation tasks: use validate_document with specific doc types like "driver's license", "tax return", "IRA application"
-- For document retrieval: use get_document
-- Use ONLY ONE tool per task execution
+INTELLIGENT TOOL SELECTION - Understanding Tool Purposes:
+
+Each tool serves a distinct purpose. Choose the tool that BEST matches your task's INTENT:
+
+🔍 **check_eligibility(client_id, product_type)** - Determines if client qualifies for a financial product
+   Examples: Verifying income limits, checking if client meets Roth IRA requirements
+   
+🏦 **open_account(client_id, account_type)** - Creates a new financial account in the system
+   Examples: Opening a Roth IRA, creating a Traditional IRA account
+   
+📋 **validate_document(client_id, doc_type)** - Verifies document completeness and accuracy
+   Examples: Checking if a tax return is valid, verifying driver's license authenticity
+   
+📄 **get_document(client_id, doc_type)** - Retrieves a specific document for review
+   Examples: Fetching tax returns for manual review, getting application forms
+   
+👤 **get_client_info(client_id)** - Retrieves comprehensive client profile and information
+   Examples: Getting client demographics, reviewing account history
+
+DECISION MAKING APPROACH:
+1. Read your task description and understand the GOAL (what outcome is needed?)
+2. Think about which tool's PURPOSE aligns with that goal
+3. Select the ONE tool that best accomplishes the task intent
+4. Execute with appropriate parameters
+
+Remember: Different tasks need different tools. Think about what the task is asking you to accomplish, not just keywords.
 
 IMPORTANT CONSTRAINTS:
 - NEVER pass lists or arrays to tools - always use single string values
@@ -120,25 +139,45 @@ Remember: You are responsible for ensuring all operations meet regulatory standa
         # Get context for LLM
         context = self.get_context_for_llm(state)
         
+        # Find the current pending task for this agent
+        current_task = None
+        for task in state.get('tasks', []):
+            if task['owner'] == 'operations_agent' and task['status'] == 'pending':
+                current_task = task
+                break
+        
         # Build the prompt
+        current_task_info = ""
+        if current_task:
+            current_task_info = f"""
+YOUR CURRENT TASK:
+Task ID: {current_task['id']}
+Description: {current_task['description']}
+Status: {current_task['status']}
+
+💡 Think about: What is this task asking you to accomplish? What outcome does it need?
+   Then select the tool whose PURPOSE best matches that outcome.
+"""
+        
         prompt = f"""You are the Operations Agent in a financial workflow system. Analyze the current situation and determine what backend operations need to be completed.
 
 CURRENT SITUATION:
 {context}
 
+{current_task_info}
+
 AVAILABLE TOOLS:
 {self.get_available_tools()}
 
 INSTRUCTIONS:
-1. Analyze the current workflow state
-2. Determine what backend operations need to be completed
-3. Use appropriate tools to gather information or take actions
-4. Check for compliance and regulatory requirements
+1. Understand the INTENT of your current task - what outcome is needed?
+2. Think about which tool's purpose best aligns with that intent
+3. Select and execute the ONE most appropriate tool
+4. Ensure compliance with all regulatory requirements
 5. Identify any potential blockers or issues
 6. Provide clear reasoning for your decisions
-7. Suggest next steps for the workflow
 
-Remember: Focus on compliance, accuracy, and ensuring all regulatory requirements are met."""
+Remember: You're an intelligent agent. Use your judgment to select the right tool based on understanding the task's goal, not just pattern matching."""
 
         # Call LLM
         messages = [
@@ -261,17 +300,35 @@ Remember: Focus on compliance, accuracy, and ensuring all regulatory requirement
         decision = f"Operations Agent analysis: {reasoning}"
         self.add_decision_to_state(state, decision, reasoning)
         
-        # Handle task completion if agent completed a task
-        if "task_completion" in parsed_response and parsed_response["task_completion"]:
-            # Find and mark ONLY THE FIRST pending task as completed
-            task_marked = False
-            for task in state["tasks"]:
-                if task["owner"] == "operations_agent" and task["status"] == "pending" and not task_marked:
-                    task["status"] = "completed"
-                    task["result"] = parsed_response["task_completion"]
-                    print(f"🤖 {self.name.upper()}: Marked task '{task['id']}' as completed")
-                    task_marked = True
+        # Find the CURRENT task (first pending task with completed dependencies)
+        current_task_id = None
+        for task in state["tasks"]:
+            if task["owner"] == "operations_agent" and task["status"] == "pending":
+                # Check if dependencies are met
+                deps_met = True
+                for dep_id in task.get("dependencies", []):
+                    dep_task = next((t for t in state["tasks"] if t["id"] == dep_id), None)
+                    if not dep_task or dep_task["status"] != "completed":
+                        deps_met = False
+                        break
+                if deps_met:
+                    current_task_id = task["id"]
                     break
+        
+        # Track if we've marked a task (prevent multiple markings in one turn)
+        task_marked_this_turn = False
+        
+        # Handle task completion if agent completed a task
+        if "task_completion" in parsed_response and parsed_response["task_completion"] and not task_marked_this_turn:
+            # Mark ONLY the current task as completed
+            if current_task_id:
+                for task in state["tasks"]:
+                    if task["id"] == current_task_id:
+                        task["status"] = "completed"
+                        task["result"] = parsed_response["task_completion"]
+                        print(f"🤖 {self.name.upper()}: Marked task '{task['id']}' as completed")
+                        task_marked_this_turn = True
+                        break
         
         # Handle compliance notes
         if "compliance_notes" in parsed_response and parsed_response["compliance_notes"]:
@@ -319,33 +376,32 @@ Remember: Focus on compliance, accuracy, and ensuring all regulatory requirement
         
         # Update workflow status based on agent's assessment
         agent_status = parsed_response.get("status", "continue")
-        if agent_status == "completed":
-            # Mark ONLY ONE task as completed
-            task_marked = False
-            for task in state["tasks"]:
-                if task["owner"] == "operations_agent" and task["status"] == "pending" and not task_marked:
-                    task["status"] = "completed"
-                    task["result"] = parsed_response.get("task_completion", "Task completed by operations agent")
-                    print(f"🤖 {self.name.upper()}: Marked task '{task['id']}' as completed")
-                    task_marked = True
-                    break
+        if agent_status == "completed" and not task_marked_this_turn:
+            # Mark ONLY the current task (with completed dependencies) as completed
+            if current_task_id:
+                for task in state["tasks"]:
+                    if task["id"] == current_task_id and task["status"] == "pending":
+                        task["status"] = "completed"
+                        task["result"] = parsed_response.get("task_completion", "Task completed by operations agent")
+                        print(f"🤖 {self.name.upper()}: Marked task '{task['id']}' as completed")
+                        task_marked_this_turn = True
+                        break
             # Don't set workflow status to completed here - let routing system handle it
         elif agent_status == "failed" or agent_status == "blocked":
             state["status"] = "failed"
         
-        # If agent is continuing but has done work, mark ONE task as completed
-        if agent_status == "continue" and "tools_to_use" in parsed_response and parsed_response["tools_to_use"]:
+        # If agent is continuing but has done work, mark THE CURRENT task as completed
+        if agent_status == "continue" and "tools_to_use" in parsed_response and parsed_response["tools_to_use"] and not task_marked_this_turn:
             # Check if we successfully executed tools and should mark task as completed
             tools_executed = parsed_response.get("tools_to_use", [])
-            if tools_executed:
-                # Mark ONLY THE FIRST pending task as completed
-                task_marked = False
+            if tools_executed and current_task_id:
+                # Mark ONLY THE CURRENT task as completed
                 for task in state["tasks"]:
-                    if task["owner"] == "operations_agent" and task["status"] == "pending" and not task_marked:
+                    if task["id"] == current_task_id and task["status"] == "pending":
                         task["status"] = "completed"
                         task["result"] = f"Completed task using tools: {[t.get('tool', 'unknown') for t in tools_executed]}"
                         print(f"🤖 {self.name.upper()}: Marked task '{task['id']}' as completed after tool execution")
-                        task_marked = True
+                        task_marked_this_turn = True
                         break
         
         # Update timestamp

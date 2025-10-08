@@ -54,6 +54,10 @@ Always respond in JSON format with the following structure:
 }
 
 TASK-SPECIFIC INSTRUCTIONS:
+- "collect documents" or "gather documents" → Use get_client_info to check existing documents, then:
+  - If documents already exist (uploaded: true, verified: true) → Mark task complete, no action needed
+  - If documents missing → Use send_notification to request documents from client
+  - Common document types: drivers_license, tax_return_2023, ira_application
 - "send forms" or "prepare forms" → ONLY use create_document and send_notification tools
 - "notify client" or "client notification" → ONLY use send_notification tool
 - "client communication" → ONLY use send_notification tool
@@ -149,15 +153,35 @@ Remember: Focus on client communication, form management, and ensuring the clien
         decision = f"Advisor Agent analysis: {reasoning}"
         self.add_decision_to_state(state, decision, reasoning)
         
-        # Handle task completion if agent completed a task
-        if "task_completion" in parsed_response and parsed_response["task_completion"]:
-            # Find and mark the current task as completed
-            for task in state["tasks"]:
-                if task["owner"] == "advisor_agent" and task["status"] == "pending":
-                    task["status"] = "completed"
-                    task["result"] = parsed_response["task_completion"]
-                    print(f"🤖 {self.name.upper()}: Marked task '{task['id']}' as completed")
+        # Find the CURRENT task (first pending task with completed dependencies)
+        current_task_id = None
+        for task in state["tasks"]:
+            if task["owner"] == "advisor_agent" and task["status"] == "pending":
+                # Check if dependencies are met
+                deps_met = True
+                for dep_id in task.get("dependencies", []):
+                    dep_task = next((t for t in state["tasks"] if t["id"] == dep_id), None)
+                    if not dep_task or dep_task["status"] != "completed":
+                        deps_met = False
+                        break
+                if deps_met:
+                    current_task_id = task["id"]
                     break
+        
+        # Track if we've marked a task (prevent multiple markings in one turn)
+        task_marked_this_turn = False
+        
+        # Handle task completion if agent completed a task
+        if "task_completion" in parsed_response and parsed_response["task_completion"] and not task_marked_this_turn:
+            # Mark ONLY the current task as completed
+            if current_task_id:
+                for task in state["tasks"]:
+                    if task["id"] == current_task_id:
+                        task["status"] = "completed"
+                        task["result"] = parsed_response["task_completion"]
+                        print(f"🤖 {self.name.upper()}: Marked task '{task['id']}' as completed")
+                        task_marked_this_turn = True
+                        break
         
         # Handle client message if provided
         if "client_message" in parsed_response and parsed_response["client_message"]:
@@ -180,11 +204,13 @@ Remember: Focus on client communication, form management, and ensuring the clien
                 print(f"🎉 {self.name.upper()}: Client notified of account opening!")
                 
                 # Mark current task as completed
-                for task in state["tasks"]:
-                    if task["owner"] == "advisor_agent" and task["status"] == "pending":
-                        task["status"] = "completed"
-                        task["result"] = "Client notified of successful account opening"
-                        break
+                if current_task_id and not task_marked_this_turn:
+                    for task in state["tasks"]:
+                        if task["id"] == current_task_id and task["status"] == "pending":
+                            task["status"] = "completed"
+                            task["result"] = "Client notified of successful account opening"
+                            task_marked_this_turn = True
+                            break
                 
                 # Check if all tasks are now completed
                 completed_tasks = len([t for t in state["tasks"] if t["status"] == "completed"])
@@ -236,29 +262,32 @@ Remember: Focus on client communication, form management, and ensuring the clien
         
         # Update workflow status based on agent's assessment
         agent_status = parsed_response.get("status", "continue")
-        if agent_status == "completed":
-            # Mark current task as completed before setting workflow status
-            for task in state["tasks"]:
-                if task["owner"] == "advisor_agent" and task["status"] == "pending":
-                    task["status"] = "completed"
-                    task["result"] = parsed_response.get("task_completion", "Task completed by advisor agent")
-                    print(f"🤖 {self.name.upper()}: Marked task '{task['id']}' as completed")
-                    break
+        if agent_status == "completed" and not task_marked_this_turn:
+            # Mark ONLY the current task (with completed dependencies) as completed
+            if current_task_id:
+                for task in state["tasks"]:
+                    if task["id"] == current_task_id and task["status"] == "pending":
+                        task["status"] = "completed"
+                        task["result"] = parsed_response.get("task_completion", "Task completed by advisor agent")
+                        print(f"🤖 {self.name.upper()}: Marked task '{task['id']}' as completed")
+                        task_marked_this_turn = True
+                        break
             # Don't set workflow status to completed here - let routing system handle it
         elif agent_status == "failed":
             state["status"] = "failed"
         
-        # If agent is continuing but has done work, mark the current task as completed
-        if agent_status == "continue" and "tools_to_use" in parsed_response and parsed_response["tools_to_use"]:
+        # If agent is continuing but has done work, mark THE CURRENT task as completed
+        if agent_status == "continue" and "tools_to_use" in parsed_response and parsed_response["tools_to_use"] and not task_marked_this_turn:
             # Check if we successfully executed tools and should mark task as completed
             tools_executed = parsed_response.get("tools_to_use", [])
-            if tools_executed:
-                # Mark the first pending task as completed
+            if tools_executed and current_task_id:
+                # Mark ONLY THE CURRENT task as completed
                 for task in state["tasks"]:
-                    if task["owner"] == "advisor_agent" and task["status"] == "pending":
+                    if task["id"] == current_task_id and task["status"] == "pending":
                         task["status"] = "completed"
                         task["result"] = f"Completed task using tools: {[t.get('tool', 'unknown') for t in tools_executed]}"
                         print(f"🤖 {self.name.upper()}: Marked task '{task['id']}' as completed after tool execution")
+                        task_marked_this_turn = True
                         break
         
         # Update timestamp
