@@ -67,7 +67,7 @@ def route_next_node(state: WorkflowState) -> str:
                 task["status"] == "pending" and 
                 check_task_dependencies(task, state["tasks"])):
                 agent_has_ready_task = True
-                print(f"🔄 ROUTING: Verified {agent} has ready task '{task['id']}' with completed dependencies")
+                print(f"ROUTING: Verified {agent} has ready task '{task['id']}' with completed dependencies")
                 break
         
         if agent_has_ready_task:
@@ -76,7 +76,7 @@ def route_next_node(state: WorkflowState) -> str:
             elif agent == "operations_agent":
                 return "operations_agent"
         else:
-            print(f"🔄 ROUTING: {agent} has no ready tasks, clearing next_actions and continuing")
+            print(f"ROUTING: {agent} has no ready tasks, clearing next_actions and continuing")
             state["next_actions"] = []  # Clear invalid next_actions
     
     # 4. Fallback: Find first task with status "pending" and no unmet dependencies
@@ -84,10 +84,10 @@ def route_next_node(state: WorkflowState) -> str:
         for task in state["tasks"]:
             if (task["status"] == "pending" and 
                 check_task_dependencies(task, state["tasks"])):
-                print(f"🔄 ROUTING: Found pending task '{task['id']}' for {task['owner']}")
+                print(f"ROUTING: Found pending task '{task['id']}' for {task['owner']}")
                 return task["owner"]
     
     # 5. Default fallback
-    print(f"🔄 ROUTING: No more actions available, ending workflow")
+    print(f" ROUTING: No more actions available, ending workflow")
     state["status"] = "failed"  # Mark as failed if we can't find next steps
     return "end"

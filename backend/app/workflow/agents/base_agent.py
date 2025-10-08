@@ -89,12 +89,12 @@ class BaseAgent:
             
             if response.status_code != 200:
                 error_msg = f"OpenAI API error: {response.status_code} - {response.text}"
-                print(f"❌ {self.name.upper()}: {error_msg}")
+                print(f" {self.name.upper()}: {error_msg}")
                 raise Exception(error_msg)
             
             response_data = response.json()
             content = response_data['choices'][0]['message']['content']
-            print(f"✅ {self.name.upper()}: LLM response received ({len(content)} chars)")
+            print(f" {self.name.upper()}: LLM response received ({len(content)} chars)")
             
             # Cache the response
             if not hasattr(self, '_cache'):
@@ -105,15 +105,15 @@ class BaseAgent:
             
         except requests.exceptions.Timeout:
             error_msg = "LLM API call timed out"
-            print(f"⏰ {self.name.upper()}: {error_msg}")
+            print(f" {self.name.upper()}: {error_msg}")
             return f"Error: {error_msg}"
         except requests.exceptions.ConnectionError:
             error_msg = "LLM API connection failed"
-            print(f"🔌 {self.name.upper()}: {error_msg}")
+            print(f" {self.name.upper()}: {error_msg}")
             return f"Error: {error_msg}"
         except Exception as e:
             error_msg = f"LLM call failed: {str(e)}"
-            print(f"❌ {self.name.upper()}: {error_msg}")
+            print(f" {self.name.upper()}: {error_msg}")
             return f"Error: {error_msg}"
     
     def get_available_tools(self) -> List[Dict[str, str]]:

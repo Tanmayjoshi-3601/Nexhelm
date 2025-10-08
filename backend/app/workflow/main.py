@@ -130,12 +130,12 @@ def run_sample_workflows():
 if __name__ == "__main__":
     # Check for API key (now loaded from .env file)
     if not os.getenv('OPENAI_API_KEY'):
-        print("❌ Error: OPENAI_API_KEY not found in .env file")
+        print(" Error: OPENAI_API_KEY not found in .env file")
         print("Please add your OpenAI API key to the .env file:")
         print("OPENAI_API_KEY=your-api-key-here")
         exit(1)
     
-    print("✅ OpenAI API key loaded from .env file")
+    print("OpenAI API key loaded from .env file")
     
     # Run sample workflows
     result = run_sample_workflows()
