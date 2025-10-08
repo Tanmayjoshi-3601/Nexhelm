@@ -169,7 +169,9 @@ class AgentTools:
         if "error" in client_info:
             return client_info
         
-        client = client_info["client"]
+        client = client_info.get("client")
+        if not client or not isinstance(client, dict):
+            return {"eligible": False, "reason": f"Invalid client data format"}
         
         # Roth IRA eligibility check
         if product_type.lower() == "roth_ira":
@@ -177,6 +179,10 @@ class AgentTools:
             tax_doc = self.doc_store.get_document(client_id, "tax_return_2023")
             if not tax_doc:
                 return {"eligible": False, "reason": "No tax return found for income verification"}
+            
+            # Ensure tax_doc is a dict (defensive programming)
+            if not isinstance(tax_doc, dict):
+                return {"eligible": False, "reason": f"Invalid tax return format: expected dict, got {type(tax_doc).__name__}"}
             
             income = tax_doc.get("income", 0)
             # 2024 Roth IRA income limits
