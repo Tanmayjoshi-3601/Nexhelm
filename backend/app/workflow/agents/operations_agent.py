@@ -168,6 +168,21 @@ Remember: Focus on compliance, accuracy, and ensuring all regulatory requirement
                 print(f"🔧 {self.name.upper()}: Tool result: {result}")
                 
                 # CRITICAL: Check for errors in tool results
+                # Handle case where result might not be a dict
+                if not isinstance(result, dict):
+                    error_msg = f"Tool returned invalid format: {result}"
+                    print(f"❌ {self.name.upper()}: Tool '{tool_name}' returned non-dict: {error_msg}")
+                    self.add_blocker_to_state(state, f"{tool_name} failed: {error_msg}")
+                    for task in state["tasks"]:
+                        if task["owner"] == "operations_agent" and task["status"] == "pending":
+                            task["status"] = "failed"
+                            task["result"] = f"Failed: {error_msg}"
+                            print(f"❌ {self.name.upper()}: Marked task '{task['id']}' as failed")
+                            break
+                    state["status"] = "blocked"
+                    state["next_actions"] = []
+                    return state
+                
                 if result.get("success") == False or "error" in result:
                     error_msg = result.get("error") or result.get("message", "Unknown error")
                     print(f"❌ {self.name.upper()}: Tool '{tool_name}' failed: {error_msg}")
