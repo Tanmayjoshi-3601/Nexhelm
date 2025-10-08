@@ -4,6 +4,7 @@ Provides real-time workflow execution updates to frontend
 """
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 from sse_starlette.sse import EventSourceResponse
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
@@ -13,14 +14,17 @@ from datetime import datetime
 import sys
 from io import StringIO
 import contextlib
+import os
 
 # Import workflow components
 try:
     from .workflow.graph import app as workflow_app
     from .workflow.state import WorkflowState
+    from .workflow.storage import get_account_system
 except ImportError:
     from app.workflow.graph import app as workflow_app
     from app.workflow.state import WorkflowState
+    from app.workflow.storage import get_account_system
 
 
 router = APIRouter(prefix="/api/workflow", tags=["workflow"])
@@ -432,5 +436,33 @@ async def get_workflow_scenarios():
                 "agents_involved": ["Orchestrator", "Operations", "Advisor"]
             }
         ]
+    }
+
+
+@router.get("/accounts-log")
+async def get_accounts_log():
+    """Download CSV log of all created accounts"""
+    account_system = get_account_system()
+    csv_path = account_system.get_csv_log_path()
+    
+    if not os.path.exists(csv_path):
+        raise HTTPException(status_code=404, detail="No accounts log found")
+    
+    return FileResponse(
+        path=csv_path,
+        media_type='text/csv',
+        filename='nexhelm_accounts_log.csv'
+    )
+
+
+@router.get("/accounts")
+async def get_all_accounts():
+    """Get all created accounts as JSON"""
+    account_system = get_account_system()
+    accounts = account_system.get_all_accounts()
+    
+    return {
+        "total_accounts": len(accounts),
+        "accounts": accounts
     }
 

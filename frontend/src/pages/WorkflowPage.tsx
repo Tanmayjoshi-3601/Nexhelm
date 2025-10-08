@@ -24,7 +24,8 @@ import {
     Clock,
     AlertCircle,
     ChevronDown,
-    ChevronUp
+    ChevronUp,
+    Download
 } from 'lucide-react';
 
 // Backend URL
@@ -339,6 +340,33 @@ const WorkflowPage: React.FC = () => {
         toast('Workflow stopped', { icon: '⏹️' });
     };
 
+    // Download CSV log of all created accounts
+    const downloadCSVLog = async () => {
+        try {
+            const response = await axios.get(`${BACKEND_URL}/api/workflow/accounts-log`, {
+                responseType: 'blob'
+            });
+
+            // Create a download link
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'nexhelm_accounts_log.csv');
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+
+            toast.success('📥 CSV log downloaded successfully!');
+        } catch (error: any) {
+            if (error.response?.status === 404) {
+                toast.error('No accounts log found. Create an account first!');
+            } else {
+                toast.error('Failed to download CSV log');
+            }
+            console.error('CSV download error:', error);
+        }
+    };
+
     // Update progress based on task completion
     useEffect(() => {
         const validTasks = tasks.filter(t => t.id && (t.description || t.owner));
@@ -612,11 +640,11 @@ const WorkflowPage: React.FC = () => {
                             />
                         </div>
 
-                        <div className="flex items-end">
+                        <div className="grid grid-cols-2 gap-3 items-end">
                             {!isRunning ? (
                                 <button
                                     onClick={startWorkflow}
-                                    className="w-full px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transform hover:scale-105"
+                                    className="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transform hover:scale-105"
                                 >
                                     <Play size={20} />
                                     <span>Start Workflow</span>
@@ -624,12 +652,19 @@ const WorkflowPage: React.FC = () => {
                             ) : (
                                 <button
                                     onClick={stopWorkflow}
-                                    className="w-full px-6 py-2 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl hover:from-red-700 hover:to-pink-700 transition-all flex items-center justify-center space-x-2 shadow-lg"
+                                    className="px-6 py-2 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl hover:from-red-700 hover:to-pink-700 transition-all flex items-center justify-center space-x-2 shadow-lg"
                                 >
                                     <Square size={20} />
                                     <span>Stop Workflow</span>
                                 </button>
                             )}
+                            <button
+                                onClick={downloadCSVLog}
+                                className="px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transform hover:scale-105"
+                            >
+                                <Download size={20} />
+                                <span>Download Log</span>
+                            </button>
                         </div>
                     </div>
 

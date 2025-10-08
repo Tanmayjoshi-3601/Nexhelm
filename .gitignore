@@ -209,3 +209,6 @@ __marimo__/
 # Redis dump files
 *.rdb
 dump.rdb
+
+# Account creation CSV logs
+accounts_log.csv

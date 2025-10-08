@@ -4,6 +4,9 @@ Provides in-memory storage for client data, documents, and accounts.
 """
 
 from typing import Optional, List, Dict, Any
+import csv
+import os
+from datetime import datetime
 
 
 class SimulatedDocumentStore:
@@ -128,13 +131,38 @@ class SimulatedCRM:
 
 class SimulatedAccountSystem:
     """
-    Simulates an account management system.
+    Simulates an account management system with CSV logging.
     """
     
     def __init__(self):
-        """Initialize with account counter"""
+        """Initialize with account counter and CSV log"""
         self.accounts = {}
         self.counter = 1000  # Start account numbers at 1000
+        self.csv_log_path = os.path.join(os.path.dirname(__file__), "../../accounts_log.csv")
+        self._initialize_csv_log()
+    
+    def _initialize_csv_log(self):
+        """Initialize CSV log file with headers if it doesn't exist"""
+        if not os.path.exists(self.csv_log_path):
+            with open(self.csv_log_path, 'w', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(['Timestamp', 'Account Number', 'Client ID', 'Account Type', 'Status'])
+    
+    def _log_account_creation(self, account_data: dict):
+        """Log account creation to CSV file"""
+        try:
+            with open(self.csv_log_path, 'a', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow([
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    account_data['account_number'],
+                    account_data['client_id'],
+                    account_data['account_type'],
+                    account_data['status']
+                ])
+                print(f"📝 Logged account creation to CSV: {account_data['account_number']}")
+        except Exception as e:
+            print(f"⚠️  Failed to log account to CSV: {e}")
     
     def open_account(self, client_id: str, account_type: str) -> dict:
         """Open a new account for a client"""
@@ -153,10 +181,13 @@ class SimulatedAccountSystem:
             "client_id": client_id,
             "account_type": account_type,
             "status": "active",
-            "created_at": "2024-01-15T10:30:00Z"
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
         
         self.accounts[account_number] = account_data
+        
+        # Log to CSV
+        self._log_account_creation(account_data)
         
         return {
             "account_number": account_number,
@@ -167,6 +198,14 @@ class SimulatedAccountSystem:
     def get_account(self, account_number: str) -> Optional[dict]:
         """Get account information by account number"""
         return self.accounts.get(account_number)
+    
+    def get_csv_log_path(self) -> str:
+        """Get the path to the CSV log file"""
+        return self.csv_log_path
+    
+    def get_all_accounts(self) -> List[Dict[str, Any]]:
+        """Get all accounts as a list"""
+        return list(self.accounts.values())
 
 
 # Module-level instances for easy import (singleton pattern)

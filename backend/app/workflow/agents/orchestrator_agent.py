@@ -376,6 +376,18 @@ Create a realistic, comprehensive workflow plan."""
         # For IRA opening requests, ensure account creation task exists
         if "ira" in request_type.lower() or "open" in request_type.lower():
             
+            # Debug: Print all tasks for inspection
+            print(f"🔍 {self.name.upper()}: Checking {len(tasks)} tasks for account creation:")
+            for task in tasks:
+                desc_lower = task.get("description", "").lower()
+                owner = task.get("owner", "")
+                has_keywords = (
+                    ("open_account" in desc_lower) or
+                    ("create" in desc_lower and "account" in desc_lower) or
+                    ("open" in desc_lower and "account" in desc_lower)
+                )
+                print(f"   - Task {task.get('id')}: owner={owner}, has_keywords={has_keywords}, desc='{task.get('description', '')[:60]}...'")
+            
             # Check if account creation task exists (look for various patterns)
             has_account_creation = any(
                 (
@@ -386,6 +398,8 @@ Create a realistic, comprehensive workflow plan."""
                 task.get("owner") == "operations_agent"
                 for task in tasks
             )
+            
+            print(f"🔍 {self.name.upper()}: has_account_creation = {has_account_creation}")
             
             if not has_account_creation:
                 print(f"⚠️  {self.name.upper()}: CRITICAL - Account creation task missing! Adding it now...")
