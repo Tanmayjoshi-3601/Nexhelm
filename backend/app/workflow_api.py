@@ -20,11 +20,11 @@ import os
 try:
     from .workflow.graph import app as workflow_app
     from .workflow.state import WorkflowState
-    from .workflow.storage import get_account_system
+    from .workflow.storage import get_account_system, get_crm, get_doc_store
 except ImportError:
     from app.workflow.graph import app as workflow_app
     from app.workflow.state import WorkflowState
-    from app.workflow.storage import get_account_system
+    from app.workflow.storage import get_account_system, get_crm, get_doc_store
 
 
 router = APIRouter(prefix="/api/workflow", tags=["workflow"])
@@ -464,5 +464,78 @@ async def get_all_accounts():
     return {
         "total_accounts": len(accounts),
         "accounts": accounts
+    }
+
+
+@router.get("/systems/crm")
+async def get_crm_data():
+    """Get all CRM client data"""
+    crm = get_crm()
+    clients = crm.get_all_clients()
+    
+    # Format for better display
+    formatted_clients = []
+    for client_id, client_data in clients.items():
+        formatted_clients.append({
+            "client_id": client_id,
+            **client_data
+        })
+    
+    return {
+        "total_clients": len(formatted_clients),
+        "clients": formatted_clients
+    }
+
+
+@router.get("/systems/documents")
+async def get_documents_data():
+    """Get all document store data"""
+    doc_store = get_doc_store()
+    documents = doc_store.get_all_documents()
+    
+    # Count total documents
+    total_docs = sum(len(docs) for docs in documents.values())
+    
+    return {
+        "total_documents": total_docs,
+        "documents": documents
+    }
+
+
+@router.get("/systems/all")
+async def get_all_systems_data():
+    """Get data from all backend systems"""
+    account_system = get_account_system()
+    crm = get_crm()
+    doc_store = get_doc_store()
+    
+    accounts = account_system.get_all_accounts()
+    clients = crm.get_all_clients()
+    documents = doc_store.get_all_documents()
+    
+    # Format clients
+    formatted_clients = []
+    for client_id, client_data in clients.items():
+        formatted_clients.append({
+            "client_id": client_id,
+            **client_data
+        })
+    
+    # Count total documents
+    total_docs = sum(len(docs) for docs in documents.values())
+    
+    return {
+        "accounts": {
+            "total": len(accounts),
+            "data": accounts
+        },
+        "crm": {
+            "total": len(formatted_clients),
+            "data": formatted_clients
+        },
+        "documents": {
+            "total": total_docs,
+            "data": documents
+        }
     }
 

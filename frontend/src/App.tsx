@@ -6,11 +6,12 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { Brain, TrendingUp, Home } from 'lucide-react';
+import { Brain, TrendingUp, Home, Database } from 'lucide-react';
 
 // Import pages
 import OpportunityDetectionPage from './pages/OpportunityDetectionPage';
 import WorkflowPage from './pages/WorkflowPage';
+import SystemsPage from './pages/SystemsPage';
 
 // Navigation component
 const Navigation: React.FC = () => {
@@ -36,8 +37,8 @@ const Navigation: React.FC = () => {
                             <Link
                                 to="/"
                                 className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-2 ${isActive('/')
-                                        ? 'bg-blue-100 text-blue-700'
-                                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                                     }`}
                             >
                                 <TrendingUp size={18} />
@@ -47,12 +48,23 @@ const Navigation: React.FC = () => {
                             <Link
                                 to="/workflow"
                                 className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-2 ${isActive('/workflow')
-                                        ? 'bg-purple-100 text-purple-700'
-                                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                    ? 'bg-purple-100 text-purple-700'
+                                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                                     }`}
                             >
                                 <Brain size={18} />
                                 <span>Agentic Workflow</span>
+                            </Link>
+
+                            <Link
+                                to="/systems"
+                                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-2 ${isActive('/systems')
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                    }`}
+                            >
+                                <Database size={18} />
+                                <span>Backend Systems</span>
                             </Link>
                         </div>
                     </div>
@@ -84,6 +96,7 @@ const App: React.FC = () => {
                 <Routes>
                     <Route path="/" element={<OpportunityDetectionPage />} />
                     <Route path="/workflow" element={<WorkflowPage />} />
+                    <Route path="/systems" element={<SystemsPage />} />
                 </Routes>
             </div>
         </Router>

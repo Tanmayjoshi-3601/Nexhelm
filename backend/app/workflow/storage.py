@@ -91,6 +91,10 @@ class SimulatedDocumentStore:
         if client_id in self.documents:
             return list(self.documents[client_id].keys())
         return []
+    
+    def get_all_documents(self) -> Dict[str, Dict[str, Any]]:
+        """Get all documents for all clients"""
+        return self.documents
 
 
 class SimulatedCRM:
@@ -127,6 +131,10 @@ class SimulatedCRM:
             self.clients[client_id][field] = value
             return True
         return False
+    
+    def get_all_clients(self) -> Dict[str, Dict[str, Any]]:
+        """Get all clients"""
+        return self.clients
 
 
 class SimulatedAccountSystem:
@@ -165,7 +173,7 @@ class SimulatedAccountSystem:
             print(f"⚠️  Failed to log account to CSV: {e}")
     
     def open_account(self, client_id: str, account_type: str) -> dict:
-        """Open a new account for a client"""
+        """Open a new account for a client and update CRM"""
         # Check if client already has an account of this type
         for account in self.accounts.values():
             if account["client_id"] == client_id and account["account_type"] == account_type:
@@ -188,6 +196,17 @@ class SimulatedAccountSystem:
         
         # Log to CSV
         self._log_account_creation(account_data)
+        
+        # Update CRM to add this account to client's existing_accounts
+        crm = get_crm()
+        client = crm.get_client(client_id)
+        if client:
+            if 'existing_accounts' not in client:
+                client['existing_accounts'] = []
+            # Add the account type to existing accounts if not already there
+            if account_type not in client['existing_accounts']:
+                client['existing_accounts'].append(account_type)
+                print(f"✅ Updated CRM: Added {account_type} to {client_id}'s existing accounts")
         
         return {
             "account_number": account_number,
