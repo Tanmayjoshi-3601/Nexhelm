@@ -1,561 +1,297 @@
-# Nexhelm - AI-Powered Financial Advisory Platform
+# Nexhelm — AI Workflow Copilot for Revenue Teams
 
-A comprehensive AI-powered financial advisory platform combining real-time opportunity detection with intelligent agentic workflow automation. Built with FastAPI, React, LangGraph, WebSockets, and Redis for seamless real-time communication, intelligent workflow execution, and automated financial operations.
+Nexhelm is a production-oriented AI application that combines **real-time opportunity detection** with **multi-agent workflow automation**.
 
----
+It is designed to show how AI can turn customer conversations into measurable business outcomes:
+- detect high-value intent in live calls,
+- trigger compliant operational workflows,
+- update business systems automatically,
+- and give teams an auditable execution trail.
 
-## Table of Contents
-
-- [Core Systems](#core-systems)
-- [Features](#features)
-- [Architecture](#architecture)
-- [Quick Start](#quick-start)
-- [Using the Agentic Workflow System](#using-the-agentic-workflow-system)
-- [Backend Systems Dashboard](#backend-systems-dashboard)
-- [Demo Mode](#demo-mode)
-- [API Endpoints](#api-endpoints)
-- [Opportunity Detection Engine](#opportunity-detection-engine)
-- [Tech Stack](#tech-stack)
-- [Contributing](#contributing)
-- [License](#license)
+This repository is intentionally practical: it demonstrates the exact skills companies like Kana care about—AI-assisted development, system integration thinking, and judgment about production readiness.
 
 ---
 
-## Core Systems
+## Why this project matters (business-first)
 
-### 1. **Real-Time Opportunity Detection**
-AI-powered system that identifies financial opportunities from live meeting transcripts in real-time.
+### Core business problem
+Most revenue teams lose value in the handoff between:
+1. what customers say,
+2. what actions should happen,
+3. what systems actually get updated.
 
-### 2. **Agentic Workflow System** (NEW)
-Autonomous multi-agent system for executing complex financial workflows using LangGraph.
+That creates missed opportunities, slow follow-up, and inconsistent customer experience.
 
-### 3. **Backend Systems Dashboard** (NEW)
-Live monitoring of simulated CRM and account systems with real-time updates.
+### Nexhelm value proposition
+Nexhelm closes that gap by:
+- capturing intent from live conversations,
+- routing tasks to specialized AI agents,
+- executing operational steps against backend systems,
+- logging every action for audit/compliance.
 
----
-
-## Key Features at a Glance
-
-| Feature | Description | Technology |
-|---------|-------------|------------|
-| **Multi-Agent System** | 3 specialized AI agents (Orchestrator, Operations, Advisor) | LangGraph + GPT-4 |
-| **Real-Time Streaming** | Watch agents think and execute in real-time | Server-Sent Events (SSE) |
-| **Compliance Guardrails** | Financial regulation enforcement built-in | Custom validation logic |
-| **Live Dashboards** | Monitor CRM and account systems as they update | React + Auto-refresh |
-| **Audit Logging** | CSV transaction logs for compliance | CSV export |
-| **Opportunity Detection** | AI-powered financial opportunity identification | GPT-4 + Pattern matching |
-| **Task Management** | Intelligent task creation and routing | LangGraph state machine |
-| **WebSocket Communication** | Bidirectional real-time messaging | FastAPI WebSockets |
-| **Modern UI/UX** | Beautiful, responsive interface | React + Tailwind CSS |
-| **Demo Mode** | 3 realistic conversation scenarios | Simulated transcripts |
+### Expected business impact
+| Outcome | How Nexhelm drives it | Typical impact direction |
+|---|---|---|
+| Faster response time | Real-time detection + automated workflow kickoff | ↓ Time-to-action |
+| Higher conversion / upsell | Opportunity prompts and structured follow-up | ↑ Revenue per client |
+| Lower operational cost | Automated eligibility checks, document flow, account ops | ↓ Manual effort |
+| Better compliance posture | Audit logs + deterministic task trail | ↓ Risk exposure |
+| Better manager visibility | Live systems dashboard + workflow telemetry | ↑ Operational control |
 
 ---
 
-## Features
+## Use cases this is built for
 
-### **Intelligent Opportunity Detection**
-- **AI-Powered Analysis**: Uses GPT-4 for sophisticated financial opportunity detection
-- **Real-Time Processing**: Analyzes conversation context as it happens
-- **Multiple Opportunity Types**: Retirement planning, education savings, life insurance, estate planning
-- **Priority Scoring**: High/Medium/Low priority classification with numerical scores
-- **Context-Aware**: Considers client profile, age, income, and conversation history
+### 1) Conversation-to-revenue acceleration
+**Example:** Advisor hears retirement/education/life-event signals in a meeting.
 
-### **Agentic Workflow System**
-- **Multi-Agent Architecture**: Orchestrator, Operations, and Advisor agents working together
-- **LangGraph Framework**: State-based workflow execution with intelligent routing
-- **Real-Time Streaming**: Live updates of agent communication and task execution
-- **Autonomous Task Planning**: Agents intelligently create and execute workflows
-- **Domain-Specific Guardrails**: Financial compliance and safety checks built-in
-- **CSV Audit Logging**: Complete transaction history for compliance
-- **Interactive UI**: Watch agents think, communicate, and execute tasks in real-time
+Nexhelm:
+- detects relevant opportunities,
+- prioritizes them,
+- and surfaces them immediately for action.
 
-### **Backend Systems Dashboard**
-- **CRM Monitoring**: Live view of client information and existing accounts
-- **Account System Tracking**: Real-time account creation and status updates
-- **Auto-Refresh**: Dashboards update as workflows execute
-- **Simulated Systems**: Realistic backend systems for demonstrations
+**Business value:** Increases the percentage of actionable conversations converted into pipeline/revenue.
 
-### **Interactive Demo System**
-- **3 Realistic Scenarios**: Retirement Planning, Education Planning, Life Changes
-- **1-2 Minute Conversations**: Natural timing with realistic pauses
-- **Automatic Opportunity Detection**: Opportunities appear in real-time during demo
-- **Professional Demo Experience**: Perfect for presentations and client meetings
+### 2) Back-office automation for customer requests
+**Example:** Client asks to open a Roth IRA.
 
-###  **Real-Time Communication**
-- **WebSocket Integration**: Instant message delivery and opportunity notifications
-- **Server-Sent Events (SSE)**: Real-time workflow event streaming
-- **Live Transcript**: Real-time conversation display with speaker identification
-- **Toast Notifications**: High-priority opportunity alerts
-- **Connection Management**: Automatic reconnection and status indicators
+Nexhelm:
+- creates a task plan,
+- validates eligibility and documents,
+- opens account records,
+- sends customer updates.
 
-###  **Modern UI/UX**
-- **Beautiful Design**: Gradient backgrounds, smooth animations, and professional styling
-- **Responsive Layout**: Works perfectly on desktop and mobile devices
-- **Interactive Elements**: Hover effects, loading states, and visual feedback
-- **Accessibility**: Clear typography, color contrast, and intuitive navigation
-- **Thinking Indicators**: Visual feedback showing when agents are processing
+**Business value:** Reduces cycle time and delivery cost while improving consistency.
+
+### 3) Enterprise readiness & auditability
+**Example:** Team needs traceability for regulated workflows.
+
+Nexhelm:
+- records agent decisions,
+- preserves task-level status,
+- exports CSV logs for operations/compliance review.
+
+**Business value:** Lowers compliance friction and improves trust in automation.
+
+---
+
+## Integration strategy (what makes this production-relevant)
+
+Nexhelm currently uses simulated systems for demo speed, but the architecture is integration-ready.
+
+### High-value integration opportunities
+
+| Integration surface | Target systems | Why it matters |
+|---|---|---|
+| CRM | Salesforce, HubSpot, Dynamics | Sync opportunities, client records, and follow-up tasks |
+| Marketing automation | Marketo, Braze, Customer.io, Iterable | Trigger nurture/journey flows from detected intent |
+| Communication | Twilio, SendGrid, Outlook/Gmail APIs | Send compliant notifications and advisor/client updates |
+| Data warehouse/BI | Snowflake, BigQuery, Databricks | Centralize events for analytics and performance tracking |
+| Identity & auth | Okta, Auth0, Azure AD | Enterprise SSO and role-based access |
+| Compliance archiving | S3/Blob + governance tooling | Retention, audit evidence, and policy enforcement |
+
+### Integration blueprint
+1. Replace simulated tool methods with provider adapters.
+2. Add idempotency keys and retries for external writes.
+3. Add webhook/event bus support for downstream subscribers.
+4. Add tenant isolation + RBAC + audit retention policy.
+
+---
+
+## ROI model (simple, practical framing)
+
+Use this framework when discussing value with stakeholders.
+
+**Annualized benefit estimate**
+
+`Benefit = (Time saved per workflow × workflows/month × labor cost) + (Incremental conversions × average value) - (Platform + AI run cost)`
+
+### Example lens (illustrative)
+- 1,000 workflows/month
+- 12 minutes saved/workflow
+- $60/hour blended ops cost
+- 2% conversion lift on opportunities
+
+Even before conversion lift, time savings alone can justify deployment in high-volume teams.
+
+---
+
+## Product walkthrough
+
+Nexhelm has three user-facing areas:
+
+1. **Opportunity Detection** (default route `/`)
+   - Live conversation stream
+   - Opportunity scoring and prioritization
+   - Demo mode with realistic scenarios
+
+2. **Agentic Workflow** (route `/workflow`)
+   - Start workflow scenarios (e.g., Roth IRA opening)
+   - Watch agent events in real time via SSE
+   - Track task completion and workflow progress
+
+3. **Backend Systems Dashboard** (route `/systems`)
+   - Inspect simulated CRM, accounts, and document store
+   - Auto-refresh system state
+   - Export data/logs for review
+
+---
 
 ## Architecture
 
-### **Backend (FastAPI + Python + LangGraph)**
+### Backend (FastAPI + Python + LangGraph)
 ```
 backend/
 ├── app/
-│   ├── main.py                      # FastAPI server with WebSocket & SSE endpoints
-│   ├── opportunity_detector.py      # AI-powered opportunity detection engine
+│   ├── main.py                      # FastAPI server with WebSocket endpoints
+│   ├── opportunity_detector.py      # Opportunity detection engine
 │   ├── dummy_transcript.py          # Demo conversation scenarios
 │   ├── redis_client.py              # Redis state management
-│   └── workflow/                    # Agentic Workflow System
-│       ├── graph.py                 # LangGraph workflow graph definition
-│       ├── state.py                 # Workflow state management
-│       ├── routing.py               # Intelligent agent routing logic
-│       ├── storage.py               # Simulated backend systems (CRM, Accounts)
-│       ├── agents/                  # Multi-agent system
-│       │   ├── orchestrator_agent.py   # Workflow planning & task creation
-│       │   ├── operations_agent.py     # Backend operations & compliance
-│       │   └── advisor_agent.py        # Client communication & notifications
-│       ├── nodes/                   # LangGraph node implementations
-│       │   ├── orchestrator.py      # Orchestrator node
-│       │   ├── operations.py        # Operations node
-│       │   ├── advisor.py           # Advisor node
-│       │   └── supervisor.py        # Supervisor routing node
-│       └── tools/                   # Agent tool implementations
-│           └── agent_tools.py       # All agent tools (CRM, accounts, etc.)
-├── requirements.txt                 # Python dependencies
-├── account_logs.csv                 # Transaction audit log
-└── test_*.py                        # Test files
+│   ├── workflow_api.py              # Workflow SSE/REST APIs
+│   └── workflow/
+│       ├── graph.py                 # LangGraph workflow graph
+│       ├── state.py                 # Workflow state schema
+│       ├── routing.py               # Next-node routing logic
+│       ├── storage.py               # Simulated CRM/accounts/doc systems
+│       ├── agents/                  # Orchestrator, Operations, Advisor agents
+│       ├── tools/agent_tools.py     # Tools exposed to agents
+│       └── tests/test_workflow.py   # Workflow tests
+└── requirements.txt
 ```
 
-### **Frontend (React + TypeScript)**
+### Frontend (React + TypeScript + Tailwind)
 ```
 frontend/
 ├── src/
-│   ├── App.tsx                      # Main application with routing
-│   ├── pages/                       # Page components
-│   │   ├── WorkflowPage.tsx         # Agentic workflow interface
-│   │   └── SystemsPage.tsx          # Backend systems dashboard
-│   ├── index.tsx                    # Application entry point
-│   └── index.css                    # Global styles with Tailwind
-├── package.json                     # Node.js dependencies
-└── tailwind.config.js               # Tailwind CSS configuration
+│   ├── App.tsx
+│   ├── pages/
+│   │   ├── OpportunityDetectionPage.tsx
+│   │   ├── WorkflowPage.tsx
+│   │   └── SystemsPage.tsx
+│   └── index.tsx
+└── package.json
 ```
 
-### **System Architecture Diagram**
+### Runtime communication
+- **WebSocket**: real-time meeting messages + detected opportunities
+- **SSE**: streaming workflow events during agent execution
+- **REST**: setup, scenario lookup, systems data, downloads
 
-```mermaid
-graph TB
-    subgraph "Frontend (React)"
-        UI[User Interface]
-        WP[Workflow Page]
-        SP[Systems Page]
-    end
-    
-    subgraph "Backend (FastAPI)"
-        API[FastAPI Server]
-        WS[WebSocket Handler]
-        SSE[SSE Event Stream]
-        OD[Opportunity Detector]
-    end
-    
-    subgraph "Agentic Workflow (LangGraph)"
-        GRAPH[LangGraph Workflow]
-        ORCH[Orchestrator Agent]
-        OPS[Operations Agent]
-        ADV[Advisor Agent]
-        TOOLS[Agent Tools]
-    end
-    
-    subgraph "Storage & State"
-        REDIS[Redis Cache]
-        STORAGE[Simulated Systems]
-        CSV[CSV Audit Log]
-    end
-    
-    UI -->|WebSocket| WS
-    WP -->|SSE| SSE
-    SP -->|API Calls| API
-    
-    WS --> OD
-    API --> GRAPH
-    SSE --> GRAPH
-    
-    GRAPH --> ORCH
-    ORCH --> OPS
-    ORCH --> ADV
-    OPS --> TOOLS
-    ADV --> TOOLS
-    
-    TOOLS --> STORAGE
-    TOOLS --> CSV
-    OD --> REDIS
-    STORAGE --> REDIS
-```
+---
 
-### **Data Flow**
+## API endpoints (current implementation)
 
-#### **Opportunity Detection Flow**
-1. **WebSocket Connection**: Real-time bidirectional communication
-2. **Message Processing**: Store in Redis, analyze with AI
-3. **Opportunity Detection**: Context-aware financial opportunity identification
-4. **Real-Time Updates**: Instant UI updates and notifications
+### Meeting & transcript
+- `POST /api/meeting/create`
+- `GET /api/meeting/{meeting_id}/history`
+- `WebSocket /ws/{meeting_id}`
 
-#### **Agentic Workflow Flow**
-1. **Request Submission**: User initiates workflow (e.g., "Open Roth IRA")
-2. **Orchestrator Planning**: Creates task list and assigns to agents
-3. **Agent Execution**: Operations and Advisor agents execute tasks sequentially
-4. **Real-Time Streaming**: SSE updates UI with agent activities
-5. **System Updates**: CRM and account systems updated in real-time
-6. **Audit Logging**: All operations logged to CSV for compliance
+### Demo transcripts
+- `GET /api/demo/scenarios`
+- `POST /api/demo/start/{meeting_id}?scenario=<scenario_id>`
+- `POST /api/demo/stop/{meeting_id}`
+- `GET /api/demo/status/{meeting_id}`
 
-## Quick Start
+### Agentic workflow
+- `GET /api/workflow/stream` (SSE)
+- `POST /api/workflow/execute`
+- `GET /api/workflow/scenarios`
+- `GET /api/workflow/accounts-log`
+- `GET /api/workflow/accounts`
 
-### **Prerequisites**
-- Python 3.11+ with conda
+### Backend systems
+- `GET /api/workflow/systems/crm`
+- `GET /api/workflow/systems/documents`
+- `GET /api/workflow/systems/all`
+
+---
+
+## Quick start
+
+### Prerequisites
+- Python 3.11+
 - Node.js 16+
-- Redis server
-- OpenAI API key (GPT-4 recommended for best results)
+- Redis
+- OpenAI API key
 
-### **1. Environment Setup**
+### 1) Install dependencies
 ```bash
-# Create and activate conda environment
-conda create -n nexhelm python=3.11
-conda activate nexhelm
-
-# Install Python dependencies (includes LangGraph, LangChain)
+# backend
 cd backend
 pip install -r requirements.txt
 
-# Install Node.js dependencies
+# frontend
 cd ../frontend
 npm install
 ```
 
-### **2. Environment Variables**
-Create a `.env` file in the backend directory:
+### 2) Configure environment
+Create `backend/.env`:
 ```env
 OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_MODEL=gpt-4  # or gpt-3.5-turbo
+OPENAI_MODEL=gpt-4
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_DB=0
 ```
 
-### **3. Start the Application**
-
-**Terminal 1 - Redis Server:**
+### 3) Run services
 ```bash
+# terminal 1
 redis-server
-```
 
-**Terminal 2 - Backend Server:**
-```bash
-conda activate nexhelm
+# terminal 2
 cd backend
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload
-```
 
-**Terminal 3 - Frontend Server:**
-```bash
+# terminal 3
 cd frontend
 npm start
 ```
 
-### **4. Access the Application**
-- **Main App**: http://localhost:3000
-  - Opportunity Detection (default page)
-  - Agentic Workflow (navigate via header)
-  - Backend Systems Dashboard (navigate via header)
-- **Backend API**: http://localhost:8002
-- **API Documentation**: http://localhost:8002/docs
-- **Test Interface**: http://localhost:8002/test
+### 4) Open the app
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:8002`
+- API docs: `http://localhost:8002/docs`
+- Test page: `http://localhost:8002/test`
 
 ---
 
-## Using the Agentic Workflow System
+## Enterprise hardening roadmap
 
-### **What It Does**
-Automates complex financial workflows like opening IRAs, account transfers, or compliance checks using autonomous AI agents that plan, execute, and coordinate tasks.
+To move from demo to production:
 
-### **How to Use**
-
-1. **Navigate to Workflow Page**
-   - Click "Agentic Workflow" in the header
-   
-2. **Start a Workflow**
-   - Enter client ID (e.g., `test_client_complete`)
-   - Enter request description (e.g., `Open a Roth IRA account`)
-   - Click "Start Workflow"
-
-3. **Watch Agents Work**
-   - **Events Tab**: See agent communication in real-time
-   - **Tasks Tab**: Monitor task progress and completion
-   - **Progress Bar**: Track overall workflow completion
-
-4. **Review Results**
-   - Download CSV log for audit trail
-   - Check Backend Systems Dashboard for updates
-
-### **Agent Roles**
-
-| Agent | Role | Responsibilities |
-|-------|------|------------------|
-| **Orchestrator** | Workflow Planner | Creates task list, assigns to agents, manages dependencies |
-| **Operations** | Backend Executor | Eligibility checks, document validation, account creation |
-| **Advisor** | Client Communication | Document requests, notifications, client updates |
-
-### **Example Workflows**
-
-#### **Open Roth IRA**
-```
-Client ID: test_client_complete
-Request: Open a Roth IRA account
-Expected Flow:
-1. Orchestrator creates 5 tasks
-2. Operations checks eligibility
-3. Advisor collects documents
-4. Operations validates documents
-5. Operations creates account
-6. Advisor notifies client
-```
-
-#### **Account Transfer**
-```
-Client ID: test_client_transfer
-Request: Transfer 401k to IRA
-Expected Flow:
-1. Orchestrator creates transfer workflow
-2. Operations verifies eligibility
-3. Advisor requests transfer forms
-4. Operations processes transfer
-5. Advisor confirms completion
-```
+1. **Integration hardening**
+   - Provider adapters, retries, circuit breakers
+2. **Security**
+   - SSO/RBAC, secrets vaulting, tenant-level controls
+3. **Reliability**
+   - Queueing for long-running tasks, dead-letter handling
+4. **Observability**
+   - Structured logs, traces, workflow-level SLIs/SLOs
+5. **Governance**
+   - Prompt/version controls, model fallback policy, human-in-the-loop gates
 
 ---
-
-## Backend Systems Dashboard
-
-### **What It Shows**
-Real-time view of simulated backend systems (CRM and Account System) to demonstrate how agents interact with enterprise systems.
-
-### **How to Use**
-
-1. **Navigate to Systems Page**
-   - Click "Backend Systems" in the header
-   
-2. **View CRM Data**
-   - Client information
-   - Existing accounts per client
-   - Auto-refreshes every 5 seconds
-
-3. **View Account System**
-   - All created accounts
-   - Account types and statuses
-   - Balance information
-
-4. **Watch Updates**
-   - Run a workflow from Workflow Page
-   - Watch Systems Dashboard update in real-time
-   - See new accounts appear automatically
-
-### **System Components**
-
-| System | Purpose | Data Stored |
-|--------|---------|-------------|
-| **CRM** | Client relationship management | Client profiles, contact info, account references |
-| **Account System** | Account management | Account details, balances, types, status |
-| **CSV Log** | Audit trail | All account creation transactions |
-
----
-
-## Demo Mode
-
-### **Available Scenarios**
-
-#### **1. Retirement Planning (90 seconds)**
-- Topics: 401k optimization, Roth conversions, healthcare planning
-- Opportunities: Retirement income planning, catch-up contributions, long-term care
-
-#### **2. Education Planning (75 seconds)**
-- Topics: 529 plans, college savings, Northwestern University
-- Opportunities: Education savings strategies, financial aid optimization
-
-#### **3. Life Changes & Planning (80 seconds)**
-- Topics: New baby, promotion, house buying, life insurance
-- Opportunities: Life insurance needs, estate planning, financial protection
-
-### **How to Use Demo Mode**
-1. **Start a Meeting**: Click "Start New Meeting"
-2. **Select Scenario**: Choose from dropdown (Retirement, Education, Life Changes)
-3. **Start Demo**: Click "Start Demo"
-4. **Watch Magic**: Opportunities appear automatically in real-time
-5. **Stop Anytime**: Click "Stop Demo" to end early
-
-## API Endpoints
-
-### **Meeting Management**
-- `POST /api/meeting/create` - Create new meeting session
-- `GET /api/meeting/{meeting_id}/history` - Get conversation history
-- `WebSocket /ws/{meeting_id}` - Real-time communication
-
-### **Demo System**
-- `GET /api/demo/scenarios` - Get available demo scenarios
-- `POST /api/demo/start/{meeting_id}` - Start demo conversation
-- `POST /api/demo/stop/{meeting_id}` - Stop demo conversation
-- `GET /api/demo/status/{meeting_id}` - Check demo status
-
-### **Agentic Workflow**
-- `POST /api/workflow/start` - Start agentic workflow execution
-- `GET /api/workflow/events` - Server-Sent Events stream for real-time updates
-- `GET /api/workflow/download-log` - Download CSV audit log
-
-### **Backend Systems**
-- `GET /api/systems/crm` - Get all CRM client data
-- `GET /api/systems/accounts` - Get all account system data
-- `POST /api/systems/reset` - Reset simulated systems (for testing)
-
-## Opportunity Detection Engine
-
-### **Detection Methods**
-1. **Pattern Matching**: Keyword-based detection for common financial topics
-2. **AI Analysis**: GPT-3.5-turbo for sophisticated context understanding
-3. **Client Profile**: Age, income, and family status consideration
-4. **Conversation Context**: Recent message analysis for relevance
-
-### **Opportunity Types**
-- **Retirement Planning**: 401k, IRA, Roth conversions, catch-up contributions
-- **Education Savings**: 529 plans, college funding, financial aid
-- **Life Insurance**: Term life, whole life, disability insurance
-- **Estate Planning**: Wills, trusts, beneficiary planning
-- **Investment Planning**: Portfolio diversification, risk management
-
-### **Scoring System**
-- **High Priority (85-100)**: Immediate action recommended
-- **Medium Priority (70-84)**: Important but not urgent
-- **Low Priority (50-69)**: Good to consider for future
-
-## UI Components
-
-### **Main Interface**
-- **Header**: Connection status, client profile, meeting controls
-- **Transcript Panel**: Real-time conversation with speaker identification
-- **Opportunities Panel**: Live opportunity detection with priority scoring
-- **Demo Controls**: Scenario selection and demo management
-- **Input Area**: Message composition with voice simulation
-
-### **Visual Elements**
-- **Gradient Backgrounds**: Professional blue and amber color schemes
-- **Smooth Animations**: Framer Motion for polished interactions
-- **Toast Notifications**: Real-time feedback and alerts
-- **Status Indicators**: Connection status, demo mode, processing states
-
-## Security & Best Practices
-
-### **Data Handling**
-- **Redis Storage**: Temporary conversation storage with TTL
-- **API Key Management**: Secure environment variable handling
-- **CORS Configuration**: Proper cross-origin resource sharing
-- **Input Validation**: Sanitized user inputs and message handling
-
-### **Performance**
-- **Connection Pooling**: Efficient Redis connection management
-- **Message Batching**: Optimized WebSocket message delivery
-- **Caching Strategy**: Redis-based conversation and opportunity caching
-- **Error Handling**: Graceful degradation and user feedback
 
 ## Testing
 
-### **Backend Testing**
 ```bash
-cd backend
-python -m pytest test_*.py
+# Backend workflow tests
+python -m pytest backend/app/workflow/tests/test_workflow.py
+
+# Frontend tests
+cd frontend && npm test
 ```
 
-### **Frontend Testing**
-```bash
-cd frontend
-npm test
-```
-
-### **Integration Testing**
-- WebSocket connection testing
-- Opportunity detection validation
-- Demo scenario verification
-- API endpoint testing
-
-## Monitoring & Logging
-
-### **Backend Logs**
-- Connection status and WebSocket events
-- Opportunity detection results
-- Redis operations and errors
-- API request/response logging
-
-### **Frontend Logs**
-- WebSocket connection status
-- Demo mode state changes
-- User interaction tracking
-- Error boundary handling
-
-## Deployment
-
-### **Production Considerations**
-- **Environment Variables**: Secure API key management
-- **Redis Configuration**: Production Redis setup
-- **WebSocket Scaling**: Load balancer WebSocket support
-- **SSL/TLS**: HTTPS for secure communication
-- **Monitoring**: Application performance monitoring
-
-
-### **System Documentation**
-
-6. **[SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)**
-   - High-level system overview
-   - Component relationships
-   - Technology choices
-
-7. **Workflow-Specific READMEs**
-   - `backend/workflow/README.md` - LangGraph implementation details
-
-
-
-
 ---
 
-## Tech Stack
+## Why this repo is useful for AI-builder evaluation
 
-### **Backend**
-- **FastAPI**: High-performance Python web framework
-- **LangGraph**: State machine orchestration for agents
-- **LangChain**: LLM integration and agent tooling
-- **OpenAI GPT-4**: Large language model for intelligent decision-making
-- **Redis**: In-memory data store for state management
-- **Pydantic**: Data validation and settings management
-
-### **Frontend**
-- **React 18**: Modern UI library with hooks
-- **TypeScript**: Type-safe JavaScript
-- **Tailwind CSS**: Utility-first CSS framework
-- **Lucide React**: Beautiful icon library
-- **Server-Sent Events (SSE)**: Real-time streaming from server
-
-
-
----
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
----
-
-## Acknowledgments
-
-- **OpenAI**: For providing the GPT-4 API and advancing AI capabilities
-- **LangChain & LangGraph**: For excellent agent orchestration frameworks
-- **FastAPI**: For the performant Python web framework
-- **React**: For the powerful frontend library
-- **Redis**: For reliable data storage and caching
-- **Tailwind CSS**: For beautiful, utility-first styling
-
-
+This codebase shows:
+- full-stack execution with AI-assisted development,
+- real-time event handling patterns (WebSocket + SSE),
+- practical multi-agent orchestration,
+- integration-oriented architecture,
+- and explicit attention to business outcomes rather than only model demos.
 
